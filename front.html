@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catalogue Voitures LBC + Fiches-Auto</title>
+<style>
+    /* ==== CSS GLOBAL ==== */
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: #f4f6f9;
+        margin: 0;
+        padding: 0;
+        color: #333;
+    }
+    h1 {
+        text-align: center;
+        margin: 20px 0;
+        font-size: 2em;
+        color: #1E3A8A;
+    }
+    .container {
+        max-width: 1200px;
+        margin: auto;
+        padding: 0 15px 50px 15px;
+    }
+
+    /* ==== BARRE DE RECHERCHE + FILTRES ==== */
+    .search-filters {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        gap: 10px;
+    }
+    .search-filters input, .search-filters select {
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        font-size: 1em;
+        flex: 1;
+        min-width: 120px;
+    }
+
+    /* ==== CARDS ==== */
+    .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px,1fr));
+        gap: 20px;
+    }
+    .card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        transition: transform 0.2s, box-shadow 0.2s;
+        display: flex;
+        flex-direction: column;
+    }
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 25px rgba(0,0,0,0.1);
+    }
+    .card h2 {
+        margin: 0 0 10px 0;
+        font-size: 1.2em;
+        color: #1E40AF;
+    }
+    .card p {
+        margin: 5px 0;
+        font-size: 0.9em;
+        line-height: 1.4em;
+    }
+    .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 6px;
+        background: #1E40AF;
+        color: white;
+        font-size: 0.8em;
+        margin-right: 5px;
+    }
+    .fiches-list span {
+        background: #F97316;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 5px;
+        margin-right: 4px;
+        font-size: 0.75em;
+    }
+
+    /* ==== BOUTONS ==== */
+    .btn {
+        background: #1E40AF;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-size: 0.95em;
+    }
+    .btn:hover {
+        background: #2563EB;
+    }
+
+    /* ==== EXPORT ==== */
+    .export-buttons {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    /* ==== RESPONSIVE ==== */
+    @media(max-width: 768px){
+        .search-filters {
+            flex-direction: column;
+        }
+    }
+</style>
+</head>
+<body>
+    <h1>Catalogue Voitures LBC + Fiches-Auto</h1>
+    <div class="container">
+        <!-- ===== RECHERCHE + FILTRES ===== -->
+        <div class="search-filters">
+            <input type="text" id="search" placeholder="Rechercher par titre ou description...">
+            <select id="filterMarque">
+                <option value="">Toutes les marques</option>
+            </select>
+            <select id="filterCarburant">
+                <option value="">Tout carburant</option>
+                <option value="Essence">Essence</option>
+                <option value="Diesel">Diesel</option>
+                <option value="Hybride">Hybride</option>
+                <option value="Electrique">Electrique</option>
+            </select>
+            <button class="btn" onclick="resetFilters()">Réinitialiser filtres</button>
+        </div>
+
+        <!-- ===== BOUTONS EXPORT ===== -->
+        <div class="export-buttons">
+            <button class="btn" onclick="exportJSON()">Exporter JSON</button>
+            <button class="btn" onclick="exportCSV()">Exporter CSV</button>
+        </div>
+
+        <!-- ===== CONTAINER CARDS ===== -->
+        <div class="cards" id="cardsContainer"></div>
+    </div>
+
+<script>
+    // ==== JSON DATA (POC) ====
+    const carsData = [
+        {
+            "Titre":"Renault Clio 3 1.5 dCi 70",
+            "Description":"Bon état, 187000 km, Diesel, Manuelle...",
+            "Prix":"1500 €",
+            "Ville":"Marseille",
+            "URL":"https://www.leboncoin.fr/ad/3155408378",
+            "marque":"Renault",
+            "modele":"Clio",
+            "annee":2009,
+            "km":187000,
+            "carburant":"Diesel",
+            "boite":"Manuelle",
+            "puissance_fiscale":"4 Cv",
+            "puissance_din":"70 Ch",
+            "Fiches":["Renault Clio 3 1.5 dCi 70","Renault Clio 3 1.5 dCi 85"]
+        },
+        {
+            "Titre":"Peugeot 107",
+            "Description":"Véhicule belge, 191000 km...",
+            "Prix":"2400 €",
+            "Ville":"Solre-le-Château",
+            "URL":"https://www.leboncoin.fr/ad/3155409415",
+            "marque":"Peugeot",
+            "modele":"107",
+            "annee":2009,
+            "km":191000,
+            "carburant":"Essence",
+            "boite":"Manuelle",
+            "puissance_fiscale":"4 Cv",
+            "puissance_din":"67 Ch",
+            "Fiches":["Peugeot 107 1.0","Peugeot 107 1.2"]
+        }
+    ];
+
+    // ==== GENERER LES FILTRES DYNAMIQUEMENT ====
+    const filterMarque = document.getElementById('filterMarque');
+    const marques = [...new Set(carsData.map(c => c.marque))];
+    marques.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = m;
+        filterMarque.appendChild(opt);
+    });
+
+    // ==== RENDER CARDS ====
+    function renderCards(data){
+        const container = document.getElementById('cardsContainer');
+        container.innerHTML = '';
+        data.forEach(car => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `
+                <h2>${car.Titre}</h2>
+                <p><span class="badge">${car.marque}</span> <span class="badge">${car.modele}</span> <span class="badge">${car.annee}</span> <span class="badge">${car.carburant}</span></p>
+                <p>${car.Description}</p>
+                <p><strong>Prix:</strong> ${car.Prix} | <strong>Ville:</strong> ${car.Ville}</p>
+                <p><strong>Kilométrage:</strong> ${car.km} km | <strong>Boite:</strong> ${car.boite} | <strong>Puissance:</strong> ${car.puissance_din}</p>
+                <p class="fiches-list"><strong>Fiches Auto:</strong> ${car.Fiches.map(f=>`<span>${f}</span>`).join('')}</p>
+                <p><a href="${car.URL}" target="_blank" class="btn">Voir LBC</a></p>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    // ==== FILTRAGE + RECHERCHE ====
+    const searchInput = document.getElementById('search');
+    searchInput.addEventListener('input', applyFilters);
+    filterMarque.addEventListener('change', applyFilters);
+    document.getElementById('filterCarburant').addEventListener('change', applyFilters);
+
+    function applyFilters(){
+        const search = searchInput.value.toLowerCase();
+        const marque = filterMarque.value;
+        const carburant = document.getElementById('filterCarburant').value;
+        const filtered = carsData.filter(car => {
+            return (
+                (car.Titre.toLowerCase().includes(search) || car.Description.toLowerCase().includes(search)) &&
+                (marque === "" || car.marque === marque) &&
+                (carburant === "" || car.carburant === carburant)
+            );
+        });
+        renderCards(filtered);
+    }
+
+    function resetFilters(){
+        searchInput.value = '';
+        filterMarque.value = '';
+        document.getElementById('filterCarburant').value = '';
+        renderCards(carsData);
+    }
+
+    // ==== EXPORT JSON / CSV ====
+    function exportJSON(){
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(carsData, null, 2));
+        const dlAnchor = document.createElement('a');
+        dlAnchor.setAttribute("href", dataStr);
+        dlAnchor.setAttribute("download", "cars_data.json");
+        dlAnchor.click();
+    }
+
+    function exportCSV(){
+        const headers = Object.keys(carsData[0]);
+        const csvRows = [headers.join(',')];
+        carsData.forEach(row => {
+            const values = headers.map(h => {
+                if(Array.isArray(row[h])) return `"${row[h].join('|')}"`;
+                return `"${row[h]}"`;
+            });
+            csvRows.push(values.join(','));
+        });
+        const csvStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csvRows.join('\n'));
+        const dlAnchor = document.createElement('a');
+        dlAnchor.setAttribute("href", csvStr);
+        dlAnchor.setAttribute("download", "cars_data.csv");
+        dlAnchor.click();
+    }
+
+    // ==== INIT RENDER ====
+    renderCards(carsData);
+</script>
+</body>
+</html>
