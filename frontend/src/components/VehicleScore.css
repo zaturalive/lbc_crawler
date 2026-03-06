@@ -1,0 +1,11 @@
+.vehicle-score { display: flex; align-items: center; gap: .75rem; padding: .5rem; background: #f8fafc; border-radius: 6px; }
+.vehicle-score__badge { display: flex; align-items: baseline; gap: 2px; padding: .3rem .6rem; border-radius: 6px; color: white; font-size: 1rem; }
+.vehicle-score__badge--green { background: #16a34a; }
+.vehicle-score__badge--orange { background: #ea580c; }
+.vehicle-score__badge--red { background: #dc2626; }
+.vehicle-score__badge--grey { background: #9ca3af; }
+.vehicle-score__badge strong { font-size: 1.2rem; }
+.vehicle-score__badge span { font-size: .75rem; }
+.vehicle-score__issues { list-style: none; font-size: .8rem; color: #555; flex: 1; }
+.vehicle-score__issues li::before { content: "⚠ "; }
+.vehicle-score__no-data { font-size: .8rem; color: #9ca3af; font-style: italic; }

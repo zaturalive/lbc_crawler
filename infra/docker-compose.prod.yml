@@ -1,0 +1,8 @@
+# Production overrides — image tags pinned to CI SHA
+services:
+  frontend:
+    image: ${REGISTRY_URL}/fmc-frontend:${TAG}
+  backend:
+    image: ${REGISTRY_URL}/fmc-backend:${TAG}
+  scraper:
+    image: ${REGISTRY_URL}/fmc-scraper:${TAG}

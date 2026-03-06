@@ -1,0 +1,13 @@
+.listing-card { background: white; border-radius: 8px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,.08); display: flex; flex-direction: column; gap: .75rem; }
+.listing-card__header { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; }
+.listing-card__title { font-size: 1rem; font-weight: 600; flex: 1; }
+.listing-card__price { font-size: 1.1rem; font-weight: 700; color: #1E3A8A; white-space: nowrap; }
+.listing-card__meta { display: flex; gap: .75rem; font-size: .85rem; color: #666; }
+.listing-card__keywords { display: flex; flex-wrap: wrap; gap: .4rem; }
+.listing-card__badge { padding: .2rem .55rem; border-radius: 12px; font-size: .78rem; font-weight: 600; color: white; }
+.listing-card__badge--green { background: #16a34a; }
+.listing-card__badge--blue { background: #2563eb; }
+.listing-card__badge--purple { background: #7c3aed; }
+.listing-card__badge--default { background: #6b7280; }
+.listing-card__cta { display: block; text-align: center; padding: .6rem; background: #1E3A8A; color: white; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: .9rem; margin-top: auto; }
+.listing-card__cta:hover { background: #1e40af; }

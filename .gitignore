@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Node
+node_modules/
+frontend/build/
+frontend/.env
+
+# Env files
+.env
+infra/.env
+
+# Docker
+*.log
+
+# Cache
+scraper/cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+lbc_crawler/

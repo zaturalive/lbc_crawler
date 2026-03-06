@@ -1,0 +1,22 @@
+bmb_creations_output_folder: '{project-root}/_byan-output/bmb-creations'
+user_name: dimitry
+communication_language: Francais
+document_output_language: Francais
+output_folder: '{project-root}/_byan-output'
+platform: copilot
+install_mode: manual
+byan_version: 2.7.6
+installed_agents:
+  - hermes
+  - marc
+  - bmad-master
+  - expert-merise-agile
+  - byan
+  - module-builder
+  - workflow-builder
+  - rachid
+  - drawio
+  - turbo-whisper-integration
+  - patnote
+  - carmack
+soul_mode: creator

@@ -1,0 +1,6 @@
+lbc
+requests
+beautifulsoup4
+fastapi
+uvicorn[standard]
+python-dotenv
