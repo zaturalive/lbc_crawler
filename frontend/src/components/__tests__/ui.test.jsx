@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import { Button } from '../ui/Button';
+import Button from '../ui/Button';
 import { Card, CardContent } from '../ui/Card';
-import { Input } from '../ui/Input';
+import Input from '../ui/Input';
 import Badge from '../ui/Badge';
 
 describe('UI Components (shadcn)', () => {

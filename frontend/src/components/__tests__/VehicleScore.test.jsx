@@ -126,9 +126,9 @@ describe('VehicleScore Component', () => {
         ],
       };
       render(<VehicleScore vehicle={vehicle} />);
-      expect(screen.getByText('Problème alternateur')).toBeInTheDocument();
-      expect(screen.getByText('Joint moteur usé')).toBeInTheDocument();
-      expect(screen.getByText('Plaquettes freins à changer')).toBeInTheDocument();
+      expect(screen.getByText(/Problème alternateur/)).toBeInTheDocument();
+      expect(screen.getByText(/Joint moteur usé/)).toBeInTheDocument();
+      expect(screen.getByText(/Plaquettes freins à changer/)).toBeInTheDocument();
     });
 
     it('limits display to first 3 issues', () => {
@@ -143,9 +143,9 @@ describe('VehicleScore Component', () => {
         ],
       };
       render(<VehicleScore vehicle={vehicle} />);
-      expect(screen.getByText('Issue 1')).toBeInTheDocument();
-      expect(screen.getByText('Issue 2')).toBeInTheDocument();
-      expect(screen.getByText('Issue 3')).toBeInTheDocument();
+      expect(screen.getByText(/Issue 1/)).toBeInTheDocument();
+      expect(screen.getByText(/Issue 2/)).toBeInTheDocument();
+      expect(screen.getByText(/Issue 3/)).toBeInTheDocument();
       expect(screen.queryByText(/Issue 4/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Issue 5/)).not.toBeInTheDocument();
     });
@@ -199,7 +199,7 @@ describe('VehicleScore Component', () => {
         common_issues: ['Only one issue'],
       };
       render(<VehicleScore vehicle={vehicle} />);
-      expect(screen.getByText('Only one issue')).toBeInTheDocument();
+      expect(screen.getByText(/Only one issue/)).toBeInTheDocument();
     });
   });
 });

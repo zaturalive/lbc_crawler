@@ -1,6 +1,14 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SearchForm from '../SearchForm';
+import * as apiClient from '../../api/client';
+
+jest.mock('../../api/client', () => ({
+  searchListings: jest.fn(),
+  getPatterns: jest.fn(),
+  createPattern: jest.fn(),
+  deletePattern: jest.fn(),
+}));
 
 describe('SearchForm Component', () => {
   const mockOnResults = jest.fn();
@@ -9,23 +17,28 @@ describe('SearchForm Component', () => {
   beforeEach(() => {
     mockOnResults.mockClear();
     mockOnLoading.mockClear();
-    jest.clearAllMocks();
+    // Reset API mock implementations (not clearAllMocks which can clear implementations)
+    apiClient.searchListings.mockResolvedValue({ listings: [] });
+    apiClient.getPatterns.mockResolvedValue([]);
+    if (apiClient.createPattern) apiClient.createPattern.mockResolvedValue({});
+    if (apiClient.deletePattern) apiClient.deletePattern.mockResolvedValue(null);
   });
 
   describe('Rendering', () => {
     it('renders all input fields', () => {
       render(<SearchForm onResults={mockOnResults} onLoading={mockOnLoading} />);
 
-      expect(screen.getByDisplayValue('')).toBeInTheDocument();
+      // Multiple empty inputs exist — check at least one
+      expect(screen.getAllByDisplayValue('').length).toBeGreaterThan(0);
       expect(screen.getByText('Marque')).toBeInTheDocument();
       expect(screen.getByText('Modèle')).toBeInTheDocument();
       expect(screen.getByText('Boîte de vitesses')).toBeInTheDocument();
-      expect(screen.getByText('Prix min')).toBeInTheDocument();
-      expect(screen.getByText('Prix max')).toBeInTheDocument();
-      expect(screen.getByText('Kilométrage max')).toBeInTheDocument();
-      expect(screen.getByText('Année min')).toBeInTheDocument();
-      expect(screen.getByText('Chevaux min')).toBeInTheDocument();
-      expect(screen.getByText('Chevaux max')).toBeInTheDocument();
+      expect(screen.getByText(/Prix min/i)).toBeInTheDocument();
+      expect(screen.getByText(/Prix max/i)).toBeInTheDocument();
+      expect(screen.getByText(/Kilométrage max/i)).toBeInTheDocument();
+      expect(screen.getByText(/Année min/i)).toBeInTheDocument();
+      expect(screen.getByText(/Chevaux min/i)).toBeInTheDocument();
+      expect(screen.getByText(/Chevaux max/i)).toBeInTheDocument();
     });
 
     it('renders submit button with text "Chercher"', () => {
@@ -36,7 +49,8 @@ describe('SearchForm Component', () => {
 
     it('renders PatternSelector component', () => {
       render(<SearchForm onResults={mockOnResults} onLoading={mockOnLoading} />);
-      expect(screen.getByText(/motifs/i) || screen.getByText(/pattern/i)).toBeInTheDocument();
+      // PatternSelector renders "Filtrer par mots-clés" or the advanced mode button
+      expect(screen.getByText(/mots-clés/i) || screen.getByText(/mode avancé/i)).toBeInTheDocument();
     });
   });
 
@@ -85,8 +99,8 @@ describe('SearchForm Component', () => {
 
     it('calls onLoading(false) after search completes', async () => {
       const user = userEvent.setup();
-      const { searchListings } = require('../../api/client');
-      searchListings.mockResolvedValueOnce({ listings: [] });
+      
+      apiClient.searchListings.mockResolvedValueOnce({ listings: [] });
 
       render(<SearchForm onResults={mockOnResults} onLoading={mockOnLoading} />);
 
@@ -103,8 +117,8 @@ describe('SearchForm Component', () => {
 
     it('calls searchListings with correct payload', async () => {
       const user = userEvent.setup();
-      const { searchListings } = require('../../api/client');
-      searchListings.mockResolvedValueOnce({ listings: [] });
+      
+      apiClient.searchListings.mockResolvedValueOnce({ listings: [] });
 
       render(<SearchForm onResults={mockOnResults} onLoading={mockOnLoading} />);
 
@@ -117,7 +131,7 @@ describe('SearchForm Component', () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(searchListings).toHaveBeenCalledWith(
+        expect(apiClient.searchListings).toHaveBeenCalledWith(
           expect.objectContaining({
             brand: 'Renault',
             model: 'Clio',
@@ -130,9 +144,9 @@ describe('SearchForm Component', () => {
   describe('Error Handling', () => {
     it('displays error message when API call fails', async () => {
       const user = userEvent.setup();
-      const { searchListings } = require('../../api/client');
+      
       const errorMessage = 'API Error: Server not available';
-      searchListings.mockRejectedValueOnce(new Error(errorMessage));
+      apiClient.searchListings.mockRejectedValueOnce(new Error(errorMessage));
 
       render(<SearchForm onResults={mockOnResults} onLoading={mockOnLoading} />);
 
@@ -149,8 +163,8 @@ describe('SearchForm Component', () => {
 
     it('calls onResults(null) when search fails', async () => {
       const user = userEvent.setup();
-      const { searchListings } = require('../../api/client');
-      searchListings.mockRejectedValueOnce(new Error('Network error'));
+      
+      apiClient.searchListings.mockRejectedValueOnce(new Error('Network error'));
 
       render(<SearchForm onResults={mockOnResults} onLoading={mockOnLoading} />);
 

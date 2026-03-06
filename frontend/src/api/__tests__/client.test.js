@@ -1,22 +1,14 @@
 import * as clientModule from '../../api/client';
 
 describe('API Client', () => {
-  let originalFetch;
-
-  beforeAll(() => {
-    originalFetch = global.fetch;
-  });
+  let fetchSpy;
 
   beforeEach(() => {
-    global.fetch = jest.fn();
+    fetchSpy = jest.spyOn(global, 'fetch');
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  afterAll(() => {
-    global.fetch = originalFetch;
+    jest.restoreAllMocks();
   });
 
   describe('searchListings', () => {
@@ -26,14 +18,14 @@ describe('API Client', () => {
         status: 200,
         json: jest.fn().mockResolvedValueOnce({ listings: [] }),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { searchListings } = require('../../api/client');
       const params = { brand: 'Renault', model: 'Clio' };
       
       await searchListings(params);
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining('/search'),
         expect.objectContaining({
           method: 'POST',
@@ -48,14 +40,14 @@ describe('API Client', () => {
         status: 200,
         json: jest.fn().mockResolvedValueOnce({ listings: [] }),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { searchListings } = require('../../api/client');
       const params = { brand: 'Peugeot', price_min: 5000 };
       
       await searchListings(params);
 
-      const callBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+      const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(callBody).toEqual(params);
     });
 
@@ -66,7 +58,7 @@ describe('API Client', () => {
         status: 200,
         json: jest.fn().mockResolvedValueOnce(mockData),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { searchListings } = require('../../api/client');
       const result = await searchListings({});
@@ -80,7 +72,7 @@ describe('API Client', () => {
         status: 400,
         json: jest.fn().mockResolvedValueOnce({ detail: 'Brand required' }),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { searchListings } = require('../../api/client');
       
@@ -93,7 +85,7 @@ describe('API Client', () => {
         status: 500,
         json: jest.fn().mockResolvedValueOnce({}),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { searchListings } = require('../../api/client');
       
@@ -108,12 +100,12 @@ describe('API Client', () => {
         status: 200,
         json: jest.fn().mockResolvedValueOnce([]),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { getPatterns } = require('../../api/client');
       await getPatterns();
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining('/patterns'),
         expect.objectContaining({ method: 'GET' })
       );
@@ -126,7 +118,7 @@ describe('API Client', () => {
         status: 200,
         json: jest.fn().mockResolvedValueOnce(patterns),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { getPatterns } = require('../../api/client');
       const result = await getPatterns();
@@ -142,13 +134,13 @@ describe('API Client', () => {
         status: 201,
         json: jest.fn().mockResolvedValueOnce({ id: '1' }),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { createPattern } = require('../../api/client');
       const data = { name: 'Test' };
       await createPattern(data);
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining('/patterns'),
         expect.objectContaining({ method: 'POST' })
       );
@@ -162,12 +154,12 @@ describe('API Client', () => {
         status: 204,
         json: jest.fn().mockResolvedValueOnce(null),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { deletePattern } = require('../../api/client');
       await deletePattern('123');
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining('/patterns/123'),
         expect.objectContaining({ method: 'DELETE' })
       );
@@ -179,7 +171,7 @@ describe('API Client', () => {
         status: 204,
         json: jest.fn(),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { deletePattern } = require('../../api/client');
       const result = await deletePattern('123');
@@ -195,12 +187,12 @@ describe('API Client', () => {
         status: 200,
         json: jest.fn().mockResolvedValueOnce({}),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { getVehicle } = require('../../api/client');
       await getVehicle('Renault', 'Clio');
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining('/vehicles?brand=Renault&model=Clio'),
         expect.anything()
       );
@@ -212,12 +204,12 @@ describe('API Client', () => {
         status: 200,
         json: jest.fn().mockResolvedValueOnce({}),
       };
-      global.fetch.mockResolvedValueOnce(mockResponse);
+      fetchSpy.mockResolvedValueOnce(mockResponse);
 
       const { getVehicle } = require('../../api/client');
       await getVehicle('Peugeot-Citroën', 'C3 Picasso');
 
-      const url = global.fetch.mock.calls[0][0];
+      const url = fetchSpy.mock.calls[0][0];
       expect(url).toContain(encodeURIComponent('Peugeot-Citroën'));
       expect(url).toContain(encodeURIComponent('C3 Picasso'));
     });

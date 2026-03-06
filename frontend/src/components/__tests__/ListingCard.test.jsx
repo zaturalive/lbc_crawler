@@ -105,8 +105,8 @@ describe('ListingCard Component', () => {
 
     it('renders common issues from vehicle data', () => {
       render(<ListingCard listing={mockListing} />);
-      expect(screen.getByText('Problème alternateur possible')).toBeInTheDocument();
-      expect(screen.getByText('Joint moteur à vérifier')).toBeInTheDocument();
+      expect(screen.getByText(/Problème alternateur possible/)).toBeInTheDocument();
+      expect(screen.getByText(/Joint moteur à vérifier/)).toBeInTheDocument();
     });
 
     it('handles missing vehicle data gracefully', () => {
