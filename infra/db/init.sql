@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
     common_issues       JSON,
     fuel_type           VARCHAR(50),
     scraped_at          DATETIME DEFAULT NOW(),
-    INDEX idx_brand_model (brand, model)
+    UNIQUE KEY uk_brand_model (brand, model)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- LBC listings
