@@ -1,0 +1,96 @@
+# Local development — builds from source, no registry needed
+# Usage: docker compose -f docker-compose.dev.yml up --build
+
+services:
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: fmc-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - proxy
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: fmc-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_NAME=find_my_car
+      - DB_USER=fmc
+      - DB_PASSWORD=devpassword
+      - SCRAPER_URL=http://scraper:8001
+      - CORS_ORIGINS=*
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - proxy
+      - internal
+
+  scraper:
+    build:
+      context: ../scraper
+      dockerfile: Dockerfile
+    container_name: fmc-scraper-dev
+    restart: unless-stopped
+    environment:
+      - LBC_USER_AGENT=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - internal
+
+  mariadb:
+    image: mariadb:11
+    container_name: fmc-mariadb-dev
+    restart: unless-stopped
+    environment:
+      - MARIADB_ROOT_PASSWORD=devrootpassword
+      - MARIADB_DATABASE=find_my_car
+      - MARIADB_USER=fmc
+      - MARIADB_PASSWORD=devpassword
+    volumes:
+      - mariadb_dev_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - internal
+
+networks:
+  proxy:
+    external: false
+  internal:
+    external: false
+
+volumes:
+  mariadb_dev_data:
