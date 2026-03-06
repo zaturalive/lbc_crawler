@@ -1,7 +1,7 @@
 import VehicleScore from './VehicleScore';
 import Badge from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
-import { ExternalLink, MapPin, Gauge, Calendar, Zap, Fuel, Heart } from 'lucide-react';
+import { ExternalLink, MapPin, Gauge, Calendar, Zap, Fuel, Heart, DoorOpen, Users, Palette, Settings2 } from 'lucide-react';
 
 function formatMileage(km) {
   if (!km) return null;
@@ -15,7 +15,7 @@ const KEYWORD_VARIANTS = {
 };
 
 export default function ListingCard({ listing, onOpenModal, isLiked = false, onToggleLike }) {
-  const { title, price, year, mileage, location, url, matched_keywords, vehicle, gearbox, horsepower, fuel_type } = listing;
+  const { title, price, year, mileage, location, url, matched_keywords, vehicle, gearbox, horsepower, fuel_type, doors, seats, color } = listing;
 
   return (
     <Card
@@ -55,11 +55,15 @@ export default function ListingCard({ listing, onOpenModal, isLiked = false, onT
 
         {/* Meta row */}
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-fmc-text-dim font-mono">
-          {year     && <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-fmc-accent-deep" />{year}</span>}
-          {mileage  && <span className="flex items-center gap-1"><Gauge    className="h-3 w-3 text-fmc-accent-deep" />{formatMileage(mileage)}</span>}
-          {horsepower && <span className="flex items-center gap-1"><Zap    className="h-3 w-3 text-fmc-accent-deep" />{horsepower} ch</span>}
-          {fuel_type  && <span className="flex items-center gap-1"><Fuel   className="h-3 w-3 text-fmc-accent-deep" /><span className="capitalize">{fuel_type}</span></span>}
-          {location   && <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-fmc-accent-deep" />{location}</span>}
+          {year      && <span className="flex items-center gap-1"><Calendar  className="h-3 w-3 text-fmc-accent-deep" />{year}</span>}
+          {mileage   && <span className="flex items-center gap-1"><Gauge     className="h-3 w-3 text-fmc-accent-deep" />{formatMileage(mileage)}</span>}
+          {horsepower && <span className="flex items-center gap-1"><Zap      className="h-3 w-3 text-fmc-accent-deep" />{horsepower} ch</span>}
+          {fuel_type  && <span className="flex items-center gap-1"><Fuel     className="h-3 w-3 text-fmc-accent-deep" /><span className="capitalize">{fuel_type}</span></span>}
+          {gearbox    && <span className="flex items-center gap-1"><Settings2 className="h-3 w-3 text-fmc-accent-deep" />{gearbox === 'manual' ? 'Manuelle' : 'Auto'}</span>}
+          {doors > 0  && <span className="flex items-center gap-1"><DoorOpen className="h-3 w-3 text-fmc-accent-deep" />{doors} portes</span>}
+          {seats > 0  && <span className="flex items-center gap-1"><Users    className="h-3 w-3 text-fmc-accent-deep" />{seats} places</span>}
+          {color      && <span className="flex items-center gap-1"><Palette  className="h-3 w-3 text-fmc-accent-deep" /><span className="capitalize">{color}</span></span>}
+          {location   && <span className="flex items-center gap-1"><MapPin   className="h-3 w-3 text-fmc-accent-deep" />{location}</span>}
         </div>
 
         {/* Keywords */}
