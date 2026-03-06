@@ -5,7 +5,7 @@
 
 
 # Core Configuration Values
-user_name: Yan
+user_name: Dimitry
 communication_language: Francais
 document_output_language: Francais
 output_folder: "{project-root}/_byan-output"

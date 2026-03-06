@@ -1,9 +1,1 @@
-.pattern-selector { margin-bottom: 1rem; }
-.pattern-selector__label { font-size: .85rem; font-weight: 600; color: #555; margin-bottom: .5rem; }
-.pattern-selector__checkboxes { display: flex; flex-wrap: wrap; gap: .5rem; }
-.pattern-selector__item { display: flex; align-items: center; gap: .35rem; cursor: pointer; font-size: .9rem; background: #f0f4ff; padding: .3rem .6rem; border-radius: 4px; }
-.pattern-selector__hint { color: #888; font-size: .75rem; display: none; }
-.pattern-selector__advanced-toggle { background: none; border: none; color: #1E3A8A; cursor: pointer; font-size: .85rem; margin-top: .5rem; text-decoration: underline; }
-.pattern-selector__advanced { margin-top: .75rem; display: flex; flex-direction: column; gap: .35rem; }
-.pattern-selector__advanced input { padding: .5rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; }
-.pattern-selector__error { color: #dc2626; font-size: .8rem; }
+

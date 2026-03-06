@@ -11,6 +11,4 @@ router = APIRouter()
 @router.post("/search", response_model=SearchResult)
 async def search(req: SearchRequest, db: AsyncSession = Depends(get_db)):
     result = await run_search(req, db)
-    if result.count == 0 and not result.listings:
-        raise HTTPException(status_code=503, detail={"error": "scraper_unavailable", "listings": []})
     return result

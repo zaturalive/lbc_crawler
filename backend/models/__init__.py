@@ -15,7 +15,10 @@ class Vehicle(Base):
     year_start        = Column(Integer)
     year_end          = Column(Integer)
     reliability_score = Column(Integer)
+    total_testimonials= Column(Integer, default=0)
     common_issues     = Column(JSON)
+    known_issues_text = Column(JSON)
+    source_url        = Column(String(500))
     fuel_type         = Column(String(50))
     scraped_at        = Column(DateTime, server_default=func.now())
 
@@ -35,6 +38,10 @@ class Listing(Base):
     mileage          = Column(Integer)
     horsepower       = Column(Integer)
     gearbox          = Column(Enum("manual", "automatic"))
+    fuel_type        = Column(String(50))
+    doors            = Column(Integer)
+    seats            = Column(Integer)
+    color            = Column(String(50))
     location         = Column(String(100))
     description      = Column(Text)
     url              = Column(String(500))
@@ -43,6 +50,7 @@ class Listing(Base):
     scraped_at       = Column(DateTime, server_default=func.now())
 
     vehicle = relationship("Vehicle", back_populates="listings")
+    likes = relationship("Like", back_populates="listing", cascade="all, delete-orphan")
 
 
 class RegexPattern(Base):
@@ -64,3 +72,20 @@ class SearchSession(Base):
     patterns     = Column(JSON)
     result_count = Column(Integer, default=0)
     created_at   = Column(DateTime, server_default=func.now())
+
+
+class Like(Base):
+    __tablename__ = "likes"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(Integer, nullable=False, default=1)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    listing = relationship("Listing", back_populates="likes")
+
+    __table_args__ = (
+        Index("idx_likes_user", "user_id"),
+        Index("idx_likes_listing", "listing_id"),
+        Index("uk_user_listing", "user_id", "listing_id", unique=True),
+    )

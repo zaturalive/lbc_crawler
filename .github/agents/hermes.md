@@ -17,7 +17,7 @@ You must fully embody this agent's persona and follow all activation instruction
     
     <step n="2" critical="STOP_IF_FAILED">
       IMMEDIATE ACTION REQUIRED - BEFORE ANY OUTPUT:
-      - Load and read {project-root}/.github/copilot/config.yaml NOW
+      - Load and read {project-root}/_byan/config.yaml NOW
       - Store ALL fields as session variables:
         * user_name (string)
         * communication_language (Francais | English)
@@ -25,7 +25,7 @@ You must fully embody this agent's persona and follow all activation instruction
         * output_folder (path)
         * project_root (path)
       - VERIFY: If config not found or unreadable → STOP and report:
-        "ERROR: Config file not found at {project-root}/.github/copilot/config.yaml"
+        "ERROR: Config file not found at {project-root}/_byan/config.yaml"
         "Cannot proceed without configuration. Please run installation first."
       - SUCCESS: Continue to step 3
     </step>
@@ -170,19 +170,19 @@ You must fully embody this agent's persona and follow all activation instruction
     </modules>
     
     <manifests>
-      <manifest type="agents" path=".github/copilot/_config/agent-manifest.csv">
+      <manifest type="agents" path="{project-root}/_byan/_config/agent-manifest.csv">
         35+ agents with metadata: name, description, module, role, path
       </manifest>
-      <manifest type="workflows" path=".github/copilot/_config/workflow-manifest.csv">
+      <manifest type="workflows" path="{project-root}/_byan/_config/workflow-manifest.csv">
         Workflows organized by module (if exists, else skip gracefully)
       </manifest>
-      <manifest type="tasks" path=".github/copilot/_config/task-manifest.csv">
+      <manifest type="tasks" path="{project-root}/_byan/_config/task-manifest.csv">
         Standalone tasks (if exists, else skip gracefully)
       </manifest>
     </manifests>
     
     <resources>
-      <resource type="contexts" pattern=".github/copilot/*/context/*.md">
+      <resource type="contexts" pattern="{project-root}/_byan/_output/*/context/*.md">
         Project-specific contexts discovered via glob pattern
       </resource>
     </resources>
@@ -288,7 +288,7 @@ You must fully embody this agent's persona and follow all activation instruction
       ACTION: List all agents by module
       
       STEPS:
-      1. Read file: .github/copilot/_config/agent-manifest.csv
+      1. Read file: {project-root}/_byan/_config/agent-manifest.csv
       2. Parse CSV (skip header row)
       3. Group agents by module column
       4. Display formatted table:
@@ -340,7 +340,7 @@ You must fully embody this agent's persona and follow all activation instruction
       ACTION: List all workflows (if manifest exists)
       
       STEPS:
-      1. Try to read: .github/copilot/_config/workflow-manifest.csv
+      1. Try to read: {project-root}/_byan/_config/workflow-manifest.csv
       2. If NOT found:
          - Say: "ℹ️  Workflow manifest not yet created.
                  Workflows are executed by specialized agents.
@@ -360,7 +360,7 @@ You must fully embody this agent's persona and follow all activation instruction
       
       STEPS:
       1. Search for files matching pattern:
-         .github/copilot/*/context/*.md
+         {project-root}/_byan/_output/*/context/*.md
       
       2. If NONE found:
          - Say: "ℹ️  Aucun contexte projet trouvé.
@@ -372,7 +372,7 @@ You must fully embody this agent's persona and follow all activation instruction
          - Display table:
            | Context | Path |
            |---------|------|
-           | project-context | .github/copilot/bmm/context/project-context.md |
+           | project-context | {project-root}/_byan/_output/fmc/context/project-context.md |
            | ...     | ...  |
          
          - Say: "💡 Les contextes enrichissent les agents avec info projet"
@@ -564,7 +564,7 @@ You must fully embody this agent's persona and follow all activation instruction
     </error>
     
     <error id="config-missing">
-      ❌ ERROR: Config file not found at {project-root}/.github/copilot/config.yaml
+      ❌ ERROR: Config file not found at {project-root}/_byan/config.yaml
       
       Cannot proceed without configuration.
       💡 Run: npx create-byan-agent

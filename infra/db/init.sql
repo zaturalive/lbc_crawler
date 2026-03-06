@@ -12,7 +12,10 @@ CREATE TABLE IF NOT EXISTS vehicles (
     year_start          INT,
     year_end            INT,
     reliability_score   TINYINT,
+    total_testimonials  INT DEFAULT 0,
     common_issues       JSON,
+    known_issues_text   JSON,
+    source_url          VARCHAR(500),
     fuel_type           VARCHAR(50),
     scraped_at          DATETIME DEFAULT NOW(),
     UNIQUE KEY uk_brand_model (brand, model)
@@ -59,6 +62,17 @@ CREATE TABLE IF NOT EXISTS search_sessions (
     patterns        JSON,
     result_count    INT DEFAULT 0,
     created_at      DATETIME DEFAULT NOW()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Likes / Favoris
+CREATE TABLE IF NOT EXISTS likes (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL DEFAULT 1,
+    listing_id  INT NOT NULL,
+    created_at  DATETIME DEFAULT NOW(),
+    UNIQUE KEY uk_user_listing (user_id, listing_id),
+    FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE,
+    INDEX idx_likes_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Default regex patterns

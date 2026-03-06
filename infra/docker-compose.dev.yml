@@ -11,6 +11,11 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     depends_on:
       backend:
         condition: service_healthy
@@ -54,6 +59,9 @@ services:
     restart: unless-stopped
     environment:
       - LBC_USER_AGENT=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+      - LBC_MAX_PAGES=10
+      - LBC_RATE_MIN=1.0
+      - LBC_RATE_MAX=2.0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 15s
@@ -85,6 +93,16 @@ services:
       start_period: 30s
     networks:
       - internal
+
+  webdb:
+    image: webdb/app
+    container_name: fmc-webdb-dev
+    restart: unless-stopped
+    ports:
+      - "22072:22071"
+    networks:
+      - internal
+      - proxy
 
 networks:
   proxy:

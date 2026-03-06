@@ -25,6 +25,7 @@ class ScrapeRequest(BaseModel):
     model: Optional[str] = None
     price_min: Optional[int] = None
     price_max: Optional[int] = None
+    mileage_min: Optional[int] = None
     mileage_max: Optional[int] = None
     year_min: Optional[int] = None
     horsepower_min: Optional[int] = None
@@ -58,6 +59,7 @@ def scrape(req: ScrapeRequest):
         price_min=req.price_min,
         price_max=req.price_max,
         mileage_max=req.mileage_max,
+        mileage_min=req.mileage_min,
         year_min=req.year_min,
         horsepower_min=req.horsepower_min,
         horsepower_max=req.horsepower_max,

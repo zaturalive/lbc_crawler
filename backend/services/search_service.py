@@ -3,6 +3,7 @@ import os
 from typing import Optional
 
 import httpx
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,7 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
         "price_min": req.price_min,
         "price_max": req.price_max,
         "mileage_max": req.mileage_max,
+        "mileage_min": req.mileage_min,
         "year_min": req.year_min,
         "horsepower_min": req.horsepower_min,
         "horsepower_max": req.horsepower_max,
@@ -67,19 +69,24 @@ async def _call_scraper(payload: dict) -> list[dict]:
     try:
         async with httpx.AsyncClient(timeout=SCRAPER_TIMEOUT) as client:
             resp = await client.post(f"{SCRAPER_URL}/scrape", json=payload)
+            if resp.status_code == 422:
+                detail = resp.json().get("detail", "Erreur de validation scraper")
+                raise HTTPException(status_code=422, detail=detail)
             resp.raise_for_status()
             data = resp.json()
             # Scraper returns {"listings": [...], "count": N}
             return data.get("listings", data) if isinstance(data, dict) else data
+    except HTTPException:
+        raise
     except httpx.TimeoutException:
         logger.error("Scraper timed out after %ss", SCRAPER_TIMEOUT)
-        return []
+        raise HTTPException(status_code=503, detail="Le scraper ne répond pas (timeout). Réessaie dans quelques secondes.")
     except httpx.HTTPStatusError as exc:
         logger.error("Scraper returned error: %s", exc)
-        return []
+        raise HTTPException(status_code=503, detail=f"Erreur scraper: {exc.response.status_code}")
     except Exception as exc:
         logger.error("Scraper call failed: %s", exc)
-        return []
+        raise HTTPException(status_code=503, detail="Scraper inaccessible.")
 
 
 async def _resolve_vehicle(brand: str, model: str, db: AsyncSession) -> Optional[Vehicle]:

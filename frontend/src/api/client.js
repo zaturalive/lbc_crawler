@@ -22,3 +22,7 @@ export const createPattern = (data) => request('POST', '/patterns', data);
 export const deletePattern = (id) => request('DELETE', `/patterns/${id}`);
 export const getVehicle = (brand, model) =>
   request('GET', `/vehicles?brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}`);
+
+export const getLikes    = ()   => request('GET', '/likes');
+export const addLike     = (id) => request('POST',   `/listings/${id}/like`);
+export const removeLike  = (id) => request('DELETE',  `/listings/${id}/like`);

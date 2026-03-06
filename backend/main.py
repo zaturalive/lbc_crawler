@@ -3,7 +3,8 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import listings, patterns, search, vehicles
+from routers import admin, listings, patterns, search, vehicles
+from routers.likes import router as likes_router
 
 app = FastAPI(title="find_my_car API", version="1.0.0")
 
@@ -19,6 +20,8 @@ app.include_router(search.router)
 app.include_router(listings.router)
 app.include_router(vehicles.router)
 app.include_router(patterns.router)
+app.include_router(admin.router)
+app.include_router(likes_router, tags=["likes"])
 
 
 @app.get("/health")

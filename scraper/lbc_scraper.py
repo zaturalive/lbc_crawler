@@ -34,6 +34,7 @@ class SearchFilters:
     model: Optional[str] = None
     price_min: Optional[int] = None
     price_max: Optional[int] = None
+    mileage_min: Optional[int] = None
     mileage_max: Optional[int] = None
     year_min: Optional[int] = None
     horsepower_min: Optional[int] = None
@@ -149,8 +150,8 @@ class LBCScraper:
                     price_max = filters.price_max or 10000000
                     search_kwargs["price"] = (price_min, price_max)
                 
-                if filters.mileage_max is not None:
-                    search_kwargs["mileage"] = (0, filters.mileage_max)
+                if filters.mileage_min is not None or filters.mileage_max is not None:
+                    search_kwargs["mileage"] = (filters.mileage_min or 0, filters.mileage_max or 10_000_000)
                 
                 if filters.year_min is not None:
                     # regdate must be a tuple (min_year, max_year)
@@ -212,6 +213,9 @@ class LBCScraper:
             # Filter by mileage
             if filters.mileage_max is not None and listing.get("mileage"):
                 if listing["mileage"] > filters.mileage_max:
+                    continue
+            if filters.mileage_min is not None and listing.get("mileage"):
+                if listing["mileage"] < filters.mileage_min:
                     continue
             
             # Filter by year (using regdate)

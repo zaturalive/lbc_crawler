@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getPatterns } from '../api/client';
-import './PatternSelector.css';
+import Input from './ui/Input';
+import Button from './ui/Button';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function PatternSelector({ selected, onChange, customRegex, onCustomRegexChange }) {
   const [patterns, setPatterns] = useState([]);
@@ -25,40 +27,64 @@ export default function PatternSelector({ selected, onChange, customRegex, onCus
   }
 
   return (
-    <div className="pattern-selector">
-      <p className="pattern-selector__label">Mots-clés à rechercher dans l'annonce :</p>
-      <div className="pattern-selector__checkboxes">
-        {patterns.map(p => (
-          <label key={p.id} className="pattern-selector__item">
-            <input
-              type="checkbox"
-              checked={selected.includes(p.id)}
-              onChange={() => togglePattern(p.id)}
-            />
-            <span>{p.name}</span>
-            {p.description && <small className="pattern-selector__hint">{p.description}</small>}
-          </label>
-        ))}
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm font-semibold text-fmc-text mb-3">Filtrer par mots-clés :</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {patterns.map(p => (
+            <label key={p.id} className="flex items-start gap-3 p-3 rounded-md border border-fmc-accent-deep bg-fmc-card hover:bg-fmc-surface hover:border-fmc-border cursor-pointer transition-all duration-200">
+              <input
+                type="checkbox"
+                checked={selected.includes(p.id)}
+                onChange={() => togglePattern(p.id)}
+                className="mt-1 rounded"
+              />
+              <div className="flex-1">
+                <span className="font-medium text-fmc-text">{p.name}</span>
+                {p.description && <p className="text-xs text-fmc-text-muted mt-1">{p.description}</p>}
+              </div>
+            </label>
+          ))}
+        </div>
       </div>
-      <button
-        type="button"
-        className="pattern-selector__advanced-toggle"
-        onClick={() => setShowAdvanced(v => !v)}
-      >
-        {showAdvanced ? '▲ Masquer le mode avancé' : '▼ Mode avancé (expression personnalisée)'}
-      </button>
+
+      <div className="border-t border-fmc-accent-deep/40 pt-4">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => setShowAdvanced(v => !v)}
+          className="flex items-center gap-2"
+        >
+          {showAdvanced ? (
+            <>
+              <ChevronUp className="h-4 w-4" />
+              Masquer le mode avancé
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-4 w-4" />
+              Mode avancé (expression personnalisée)
+            </>
+          )}
+        </Button>
+      </div>
+
       {showAdvanced && (
-        <div className="pattern-selector__advanced">
-          <label>
-            <span>Expression régulière personnalisée :</span>
-            <input
+        <div className="space-y-3 p-4 rounded-md bg-fmc-surface border border-fmc-accent-deep">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-fmc-text">Expression régulière personnalisée :</label>
+            <Input
               type="text"
               value={customRegex}
               onChange={handleRegexChange}
               placeholder="ex: \\bpas\\s+de\\s+rouille\\b"
             />
-          </label>
-          {regexError && <span className="pattern-selector__error">{regexError}</span>}
+          </div>
+          {regexError && (
+            <div className="rounded-md bg-red-900/20 p-2">
+              <p className="text-sm text-red-400">{regexError}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
