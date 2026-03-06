@@ -90,9 +90,9 @@ class LBCScraper:
             except Exception as exc:
                 logger.warning("LBC search failed on page %d: %s", page, exc)
                 break
-            if not ads:
+            if not ads or not ads.ads:
                 break
-            for ad in ads:
+            for ad in ads.ads:
                 try:
                     listing = self._parse_ad(ad, filters)
                     if listing:
@@ -132,11 +132,19 @@ class LBCScraper:
 
         price = None
         try:
-            price_obj = getattr(ad, "price", None)
-            if price_obj:
-                price = int(str(price_obj).replace(" ", "").replace("€", ""))
+            price_raw = getattr(ad, "price", None)
+            if price_raw is not None:
+                price = int(float(price_raw))
         except (ValueError, TypeError):
             pass
+
+        loc = getattr(ad, "location", None)
+        if loc is not None and not isinstance(loc, dict):
+            location_str = getattr(loc, "city", "") or getattr(loc, "city_label", "") or ""
+        elif isinstance(loc, dict):
+            location_str = loc.get("city", "")
+        else:
+            location_str = ""
 
         return {
             "lbc_id": str(getattr(ad, "id", "")),
@@ -146,7 +154,7 @@ class LBCScraper:
             "mileage": mileage,
             "horsepower": horsepower,
             "gearbox": gearbox,
-            "location": str(getattr(ad, "location", {}).get("city", "") if isinstance(getattr(ad, "location", None), dict) else ""),
+            "location": location_str,
             "description": description,
             "url": str(getattr(ad, "url", "") or ""),
             "matched_keywords": matched_keywords,
