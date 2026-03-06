@@ -3,7 +3,7 @@ import os
 from typing import Optional
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +29,9 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
         "horsepower_min": req.horsepower_min,
         "horsepower_max": req.horsepower_max,
         "gearbox": req.gearbox,
+        "fuel": req.fuel,
+        "city": req.city,
+        "radius": req.radius,
         "pattern_ids": req.pattern_ids,
         "custom_regex": req.custom_regex,
     }
@@ -43,6 +46,10 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
         if vehicle:
             listing_resp.vehicle = VehicleResponse.model_validate(vehicle)
         upserted.append(listing_resp)
+
+    # Si des patterns sont sélectionnés, exclure les annonces sans aucun mot-clé trouvé
+    if req.pattern_ids:
+        upserted = [l for l in upserted if l.matched_keywords]
 
     session = SearchSession(
         filters={k: v for k, v in req.model_dump().items() if k != "pattern_ids"},
@@ -61,7 +68,9 @@ async def _call_scraper(payload: dict) -> list[dict]:
         async with httpx.AsyncClient(timeout=SCRAPER_TIMEOUT) as client:
             resp = await client.post(f"{SCRAPER_URL}/scrape", json=payload)
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            # Scraper returns {"listings": [...], "count": N}
+            return data.get("listings", data) if isinstance(data, dict) else data
     except httpx.TimeoutException:
         logger.error("Scraper timed out after %ss", SCRAPER_TIMEOUT)
         return []
@@ -74,36 +83,39 @@ async def _call_scraper(payload: dict) -> list[dict]:
 
 
 async def _resolve_vehicle(brand: str, model: str, db: AsyncSession) -> Optional[Vehicle]:
+    """DB-only lookup avec fallback fuzzy (case-insensitive LIKE).
+    LBC retourne model='clio', DB stocke 'Renault Clio 1/2/3/4/5' → match partiel.
+    """
     if not brand or not model:
         return None
+    # 1. Match exact avec score (priorité absolue)
     result = await db.execute(
-        select(Vehicle).where(Vehicle.brand == brand, Vehicle.model == model).limit(1)
+        select(Vehicle)
+        .where(Vehicle.brand == brand, Vehicle.model == model, Vehicle.reliability_score.isnot(None))
+        .limit(1)
     )
     vehicle = result.scalar_one_or_none()
     if vehicle:
         return vehicle
-
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                f"{SCRAPER_URL}/vehicle-info",
-                json={"brand": brand, "model": model},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-    except Exception as exc:
-        logger.warning("Could not fetch vehicle info for %s %s: %s", brand, model, exc)
-        return None
-
-    vehicle = Vehicle(
-        brand=brand,
-        model=model,
-        reliability_score=data.get("reliability_score"),
-        common_issues=data.get("common_issues", []),
+    # 2. Fuzzy: brand exact (case-insensitive) + model LIKE '%model%' avec score
+    result = await db.execute(
+        select(Vehicle)
+        .where(
+            func.lower(Vehicle.brand) == brand.lower(),
+            func.lower(Vehicle.model).like(f"%{model.lower()}%"),
+            Vehicle.reliability_score.isnot(None),
+        )
+        .order_by(func.length(Vehicle.model))  # préférer le modèle le plus court
+        .limit(1)
     )
-    db.add(vehicle)
-    await db.flush()
-    return vehicle
+    vehicle = result.scalar_one_or_none()
+    if vehicle:
+        return vehicle
+    # 3. Fallback sans filtre score (pour conserver le lien vehicle même sans score)
+    result = await db.execute(
+        select(Vehicle).where(Vehicle.brand == brand, Vehicle.model == model).limit(1)
+    )
+    return result.scalar_one_or_none()
 
 
 async def _upsert_listing(raw: dict, vehicle_id: Optional[int], db: AsyncSession) -> Listing:
@@ -117,6 +129,10 @@ async def _upsert_listing(raw: dict, vehicle_id: Optional[int], db: AsyncSession
             mileage=raw.get("mileage"),
             horsepower=raw.get("horsepower"),
             gearbox=raw.get("gearbox"),
+            fuel_type=raw.get("fuel_type"),
+            doors=raw.get("doors"),
+            seats=raw.get("seats"),
+            color=raw.get("color"),
             location=raw.get("location"),
             description=raw.get("description"),
             url=raw.get("url"),
@@ -127,6 +143,11 @@ async def _upsert_listing(raw: dict, vehicle_id: Optional[int], db: AsyncSession
             title=raw.get("title"),
             price=raw.get("price"),
             mileage=raw.get("mileage"),
+            fuel_type=raw.get("fuel_type"),
+            doors=raw.get("doors"),
+            seats=raw.get("seats"),
+            color=raw.get("color"),
+            location=raw.get("location"),
             matched_keywords=raw.get("matched_keywords", []),
             vehicle_id=vehicle_id,
         )

@@ -1,18 +1,23 @@
-from dataclasses import asdict, field
+import logging
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel
 
-from fiches_auto_scraper import FichesAutoScraper
+from fiches_auto_scraper import bulk_scrape_vehicles
 from lbc_scraper import LBCScraper, SearchFilters
 from regex_engine import RegexEngine
 
-app = FastAPI(title="fmc-scraper", version="1.0.0")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="fmc-scraper", version="2.0.0")
 
 _lbc = LBCScraper()
-_fiches = FichesAutoScraper()
 _regex = RegexEngine()
+
+# Track sync status
+_sync_status = {"running": False, "last_count": 0, "last_error": None}
 
 
 class ScrapeRequest(BaseModel):
@@ -25,23 +30,21 @@ class ScrapeRequest(BaseModel):
     horsepower_min: Optional[int] = None
     horsepower_max: Optional[int] = None
     gearbox: Optional[str] = None
-    pattern_ids: list[int] = field(default_factory=list)
+    fuel: Optional[str] = None
+    city: Optional[str] = None
+    radius: Optional[int] = None  # km, default 30
+    patterns: list[dict] = []
     custom_regex: Optional[str] = None
-
-
-class VehicleInfoRequest(BaseModel):
-    brand: str
-    model: str
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "sync_status": _sync_status}
 
 
 @app.post("/scrape")
 def scrape(req: ScrapeRequest):
-    extra = []
+    extra = list(req.patterns or [])
     if req.custom_regex:
         try:
             RegexEngine.validate_pattern(req.custom_regex)
@@ -59,26 +62,54 @@ def scrape(req: ScrapeRequest):
         horsepower_min=req.horsepower_min,
         horsepower_max=req.horsepower_max,
         gearbox=req.gearbox,
+        fuel=req.fuel,
+        city=req.city,
+        radius=req.radius,
         extra_patterns=extra,
     )
-    listings = _lbc.search(filters)
-
-    if req.horsepower_min or req.horsepower_max:
-        listings = [
-            l for l in listings
-            if (req.horsepower_min is None or (l["horsepower"] or 0) >= req.horsepower_min)
-            and (req.horsepower_max is None or (l["horsepower"] or 999) <= req.horsepower_max)
-        ]
-
-    return listings
+    try:
+        listings = _lbc.search(filters)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"listings": listings, "count": len(listings)}
 
 
-@app.post("/vehicle-info")
-def vehicle_info(req: VehicleInfoRequest):
-    data = _fiches.get_vehicle_data(req.brand, req.model)
-    if data is None:
-        return {"reliability_score": None, "common_issues": []}
-    return data
+@app.post("/scrape/vehicles-catalog")
+def scrape_vehicles_catalog(background_tasks: BackgroundTasks):
+    """Trigger a full fiches-auto.fr scrape (async). Returns vehicle data when complete."""
+    if _sync_status["running"]:
+        raise HTTPException(status_code=409, detail="Sync already in progress")
+
+    _sync_status["running"] = True
+    _sync_status["last_error"] = None
+
+    def _run():
+        try:
+            vehicles = bulk_scrape_vehicles()
+            _sync_status["last_count"] = len(vehicles)
+            logger.info("Bulk scrape complete: %d vehicles", len(vehicles))
+            _sync_status["vehicles_buffer"] = vehicles
+        except Exception as exc:
+            _sync_status["last_error"] = str(exc)
+            logger.error("Bulk scrape failed: %s", exc)
+        finally:
+            _sync_status["running"] = False
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "message": "Scraping fiches-auto.fr in background. Poll /scrape/vehicles-status"}
+
+
+@app.get("/scrape/vehicles-status")
+def vehicles_status():
+    """Check sync status and retrieve results when done."""
+    if _sync_status["running"]:
+        return {"status": "running"}
+    if _sync_status.get("last_error"):
+        return {"status": "error", "error": _sync_status["last_error"]}
+    vehicles = _sync_status.pop("vehicles_buffer", None)
+    if vehicles is not None:
+        return {"status": "done", "count": len(vehicles), "vehicles": vehicles}
+    return {"status": "idle", "last_count": _sync_status["last_count"]}
 
 
 if __name__ == "__main__":
