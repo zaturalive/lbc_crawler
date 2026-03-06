@@ -57,6 +57,9 @@ services:
       dockerfile: Dockerfile
     container_name: fmc-scraper-dev
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       - LBC_USER_AGENT=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
       - LBC_MAX_PAGES=10
