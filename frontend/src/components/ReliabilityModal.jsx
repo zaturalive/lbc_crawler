@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { X, ExternalLink } from 'lucide-react';
 import Badge from './ui/Badge';
-import Button from './ui/Button';
 
 function parseIssue(issue) {
   const clean = issue.replace(/[\t\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
@@ -184,17 +183,15 @@ export default function ReliabilityModal({ listing, onClose }) {
               Voir la fiche fiabilite
             </a>
           )}
-          <Button variant="primary" fullWidth asChild>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 font-mono"
-            >
-              Voir l'annonce LeBonCoin
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          </Button>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="fmc-btn-primary w-full flex items-center justify-center gap-2 font-mono"
+          >
+            Voir l'annonce LeBonCoin
+            <ExternalLink className="h-4 w-4" />
+          </a>
         </div>
       </div>
     </div>

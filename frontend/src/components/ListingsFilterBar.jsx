@@ -5,6 +5,7 @@ export default function ListingsFilterBar({ listings, onFiltered }) {
   const [titleSearch, setTitleSearch]       = useState('');
   const [checkedKeywords, setCheckedKeywords] = useState([]);
   const [kmMin, setKmMin]                   = useState('');
+  const [onlyWithFiche, setOnlyWithFiche]   = useState(false);
 
   // Stable ref to avoid stale-closure issues with the callback
   const onFilteredRef = useRef(onFiltered);
@@ -33,8 +34,11 @@ export default function ListingsFilterBar({ listings, onFiltered }) {
     if (kmMin !== '' && !isNaN(Number(kmMin)) && Number(kmMin) > 0) {
       r = r.filter(l => l.mileage >= Number(kmMin));
     }
+    if (onlyWithFiche) {
+      r = r.filter(l => l.vehicle?.source_url);
+    }
     return r;
-  }, [listings, titleSearch, checkedKeywords, kmMin]);
+  }, [listings, titleSearch, checkedKeywords, kmMin, onlyWithFiche]);
 
   // Notify parent on every change
   useEffect(() => {
@@ -51,9 +55,10 @@ export default function ListingsFilterBar({ listings, onFiltered }) {
     setTitleSearch('');
     setCheckedKeywords([]);
     setKmMin('');
+    setOnlyWithFiche(false);
   }
 
-  const hasActiveFilters = titleSearch || checkedKeywords.length > 0 || kmMin;
+  const hasActiveFilters = titleSearch || checkedKeywords.length > 0 || kmMin || onlyWithFiche;
   const total = listings?.length ?? 0;
   const filteredCount = filtered.length;
 
@@ -94,7 +99,7 @@ export default function ListingsFilterBar({ listings, onFiltered }) {
       {allKeywords.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {allKeywords.map(kw => (
-            <label key={kw} className="flex items-center gap-1 cursor-pointer select-none">
+            <label key={kw} className="flex items-center gap-1.5 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={checkedKeywords.includes(kw)}
@@ -105,6 +110,18 @@ export default function ListingsFilterBar({ listings, onFiltered }) {
           ))}
         </div>
       )}
+
+      {/* Filtre fiche fiabilité */}
+      <label className="flex items-center gap-1.5 cursor-pointer select-none flex-shrink-0">
+        <input
+          type="checkbox"
+          checked={onlyWithFiche}
+          onChange={e => setOnlyWithFiche(e.target.checked)}
+        />
+        <span className={onlyWithFiche ? 'text-fmc-accent' : 'text-fmc-text-dim'}>
+          Avec fiche fiabilité
+        </span>
+      </label>
 
       {/* Compteur + reset — poussé à droite */}
       <div className="flex items-center gap-2 ml-auto flex-shrink-0">

@@ -219,17 +219,51 @@ body {
 }
 
 /* ══════════════════════════════════════════
-   NUMBER INPUT — Hide default spinner or style it
+   NUMBER INPUT — Themed spinners
    ══════════════════════════════════════════ */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
-  opacity: 0.4;
-  filter: invert(1);
+  opacity: 1;
+  cursor: pointer;
+  filter: invert(45%) sepia(60%) saturate(600%) hue-rotate(295deg) brightness(0.9);
 }
 
-/* Checkbox — dark theme */
+/* ══════════════════════════════════════════
+   CHECKBOX — Custom dark theme
+   ══════════════════════════════════════════ */
 input[type="checkbox"] {
-  accent-color: #DC586D;
-  width: 16px;
-  height: 16px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  border: 1.5px solid #A33757;
+  border-radius: 3px;
+  background: #12121e;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+input[type="checkbox"]:hover {
+  border-color: #DC586D;
+}
+
+input[type="checkbox"]:checked {
+  background: #DC586D;
+  border-color: #DC586D;
+}
+
+input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 4px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
 }
