@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PatternSelector from './PatternSelector';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -39,7 +39,7 @@ function loadPresets() {
   catch { return []; }
 }
 
-export default function SearchForm({ onResults, onLoading }) {
+export default function SearchForm({ onResults, onLoading, initialValues = null }) {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [selectedPatterns, setSelectedPatterns] = useState([]);
   const [customRegex, setCustomRegex] = useState('');
@@ -50,8 +50,17 @@ export default function SearchForm({ onResults, onLoading }) {
   const [presets, setPresets] = useState(loadPresets);
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [presetName, setPresetName] = useState('');
+  const [selectedPresetId, setSelectedPresetId] = useState('');
 
   function set(key, val) { setForm(f => ({ ...f, [key]: val })); }
+
+  useEffect(() => {
+    if (!initialValues) return;
+    const { selectedPatterns: sp, customRegex: cr, ...rest } = initialValues;
+    setForm(prev => ({ ...EMPTY_FORM, ...rest }));
+    if (sp) setSelectedPatterns(sp);
+    if (cr) setCustomRegex(cr);
+  }, [initialValues]);
 
   function handleReset() {
     setForm({ ...EMPTY_FORM });
@@ -314,11 +323,15 @@ export default function SearchForm({ onResults, onLoading }) {
             <select
               className="fmc-input text-xs flex-1"
               style={{ height: '28px', paddingTop: '2px', paddingBottom: '2px' }}
-              defaultValue=""
+              value={selectedPresetId}
               onChange={e => {
-                const preset = presets.find(p => p.id === Number(e.target.value));
-                if (preset) loadPreset(preset);
-                e.target.value = '';
+                const val = e.target.value;
+                setSelectedPresetId(val);
+                const preset = presets.find(p => p.id === Number(val));
+                if (preset) {
+                  loadPreset(preset);
+                  setSelectedPresetId('');
+                }
               }}
             >
               <option value="" disabled>Charger un preset…</option>

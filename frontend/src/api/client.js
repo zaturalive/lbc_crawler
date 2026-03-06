@@ -1,10 +1,11 @@
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-async function request(method, path, body) {
+async function request(method, path, body, token) {
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' },
   };
+  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res = await fetch(`${API_BASE}${path}`, opts);
   if (!res.ok) {
@@ -23,6 +24,13 @@ export const deletePattern = (id) => request('DELETE', `/patterns/${id}`);
 export const getVehicle = (brand, model) =>
   request('GET', `/vehicles?brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}`);
 
-export const getLikes    = ()   => request('GET', '/likes');
-export const addLike     = (id) => request('POST',   `/listings/${id}/like`);
-export const removeLike  = (id) => request('DELETE',  `/listings/${id}/like`);
+export const getLikes    = (token)   => request('GET', '/likes', undefined, token);
+export const addLike     = (id, token) => request('POST',   `/listings/${id}/like`, undefined, token);
+export const removeLike  = (id, token) => request('DELETE',  `/listings/${id}/like`, undefined, token);
+
+export const register    = (email, password) => request('POST', '/auth/register', { email, password });
+export const verifyEmail = (token) => request('POST', '/auth/verify-email', { token });
+export const loginApi    = (email, password) => request('POST', '/auth/login', { email, password });
+export const getMe       = (token) => request('GET', '/auth/me', undefined, token);
+export const getSavedSearches = (token) => request('GET', '/users/me/searches', undefined, token);
+export const getLikedListings = (token) => request('GET', '/likes', undefined, token);

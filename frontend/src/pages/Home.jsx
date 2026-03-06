@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import ResultsGrid from '../components/ResultsGrid';
 import SearchForm from '../components/SearchForm';
 import Header from '../components/Header';
@@ -9,6 +10,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [selectedListing, setSelectedListing] = useState(null);
   const [likedIds, setLikedIds] = useState([]);
+  const location = useLocation();
+  const initialValues = location.state?.loadSearch || null;
 
   // Charge les likes au démarrage (fail silently si l'API ne répond pas)
   useEffect(() => {
@@ -65,7 +68,7 @@ export default function Home() {
                 <span className="text-fmc-accent text-xs">◈</span>
                 CRITÈRES DE RECHERCHE
               </h2>
-              <SearchForm onResults={setResults} onLoading={setLoading} />
+              <SearchForm onResults={setResults} onLoading={setLoading} initialValues={initialValues} />
             </div>
           </div>
         </main>
@@ -78,7 +81,7 @@ export default function Home() {
               <span className="text-fmc-accent">◈</span>
               FILTRES
             </h2>
-            <SearchForm onResults={setResults} onLoading={setLoading} />
+            <SearchForm onResults={setResults} onLoading={setLoading} initialValues={initialValues} />
             <button
               onClick={() => setResults(null)}
               className="mt-4 w-full text-xs text-fmc-text-dim hover:text-fmc-text-muted font-mono underline underline-offset-2 transition-colors"

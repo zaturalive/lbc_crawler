@@ -174,6 +174,16 @@ export default function ReliabilityModal({ listing, onClose }) {
 
         {/* Footer */}
         <div className="bg-fmc-panel border-t border-fmc-accent-deep/60 px-6 py-4 sticky bottom-0">
+          {vehicle?.source_url && (
+            <a
+              href={vehicle.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-center text-xs font-mono text-fmc-accent hover:text-fmc-glow underline underline-offset-2 mb-3 transition-colors"
+            >
+              Voir la fiche fiabilite
+            </a>
+          )}
           <Button variant="primary" fullWidth asChild>
             <a
               href={url}
