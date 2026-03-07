@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ResultsGrid from '../components/ResultsGrid';
@@ -12,6 +12,7 @@ export default function Home() {
   const [selectedListing, setSelectedListing] = useState(null);
   const [likedIds, setLikedIds] = useState([]);
   const [aiMode, setAiMode] = useState(false);
+  const [ripple, setRipple] = useState(null);
   const [searchHistoryId, setSearchHistoryId] = useState(null);
   const location = useLocation();
   const initialValues = location.state?.loadSearch || null;
@@ -68,8 +69,33 @@ export default function Home() {
     });
   }
 
+  function handleAiMode(active, coords) {
+    setAiMode(active);
+    if (active && coords) {
+      setRipple(coords);
+      setTimeout(() => setRipple(null), 1600);
+    }
+  }
+
   return (
-    <div className={`flex flex-col h-full transition-all duration-1000 ${aiMode ? 'ai-mode-bg' : 'bg-fmc-bg'}`}>
+    <div className={`flex flex-col h-full ${aiMode ? 'ai-mode-active' : ''}`} style={!aiMode ? {backgroundColor: '#0f0418'} : {}}>
+      {/* Aurora backdrop — derrière tout */}
+      {aiMode && (
+        <div className="ai-aurora-backdrop" aria-hidden="true">
+          <div className="ai-orb-1" />
+          <div className="ai-orb-2" />
+          <div className="ai-orb-3" />
+        </div>
+      )}
+      {/* Ripple wave depuis le clic */}
+      {ripple && (
+        <div
+          className="ai-ripple"
+          style={{ left: `${ripple.x}px`, top: `${ripple.y}px` }}
+        />
+      )}
+      {/* Tout le contenu au-dessus */}
+      <div className={aiMode ? 'ai-content-layer' : 'flex flex-col h-full'}>
       <Header />
 
       {/* LAYOUT: centered form when no results, split scroll when results */}
@@ -100,7 +126,7 @@ export default function Home() {
         /* SPLIT LAYOUT — independent scrolling */
         <div className="flex flex-1 overflow-hidden gap-0">
           {/* LEFT SIDEBAR — form with its own scroll */}
-          <aside className="w-80 flex-shrink-0 overflow-y-auto bg-fmc-panel border-r border-fmc-accent-deep/40 px-4 py-5">
+          <aside className={`w-80 flex-shrink-0 overflow-y-auto px-4 py-5 ${aiMode ? 'ai-mode-sidebar' : 'bg-fmc-panel border-r border-fmc-accent-deep/40'}`}>
             <h2 className="fmc-title text-sm mb-4 flex items-center gap-2">
               <span className="text-fmc-accent">◈</span>
               FILTRES
@@ -124,7 +150,7 @@ export default function Home() {
               onToggleLike={handleToggleLike}
               searchHistoryId={searchHistoryId}
               aiMode={aiMode}
-              onAiAnalyze={setAiMode}
+              onAiAnalyze={handleAiMode}
             />
           </main>
         </div>
@@ -151,6 +177,7 @@ export default function Home() {
           onClose={() => setSelectedListing(null)}
         />
       )}
+      </div>
     </div>
   );
 }

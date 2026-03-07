@@ -281,44 +281,178 @@ input[type="checkbox"]:checked::after {
 }
 
 
-/* ===================== AI Mode animations ===================== */
-@keyframes ai-gradient-shift {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+/* ═══════════════════════════════════════════════════════
+   AI MODE — Transformation visuelle complète
+   ═══════════════════════════════════════════════════════ */
+
+/* --- Ripple wave depuis le point de clic --- */
+@keyframes ai-ripple-expand {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0.9; }
+  70%  { opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
 }
 
-@keyframes ai-border-pulse {
-  0%, 100% { border-color: rgba(168, 85, 247, 0.5); box-shadow: 0 0 8px rgba(168, 85, 247, 0.3); }
-  33%       { border-color: rgba(6, 182, 212, 0.5);  box-shadow: 0 0 8px rgba(6, 182, 212, 0.3); }
-  66%       { border-color: rgba(236, 72, 153, 0.5); box-shadow: 0 0 8px rgba(236, 72, 153, 0.3); }
-}
-
-@keyframes ai-bg-wave {
-  0%   { background-position: 0% 0%; }
-  50%  { background-position: 100% 100%; }
-  100% { background-position: 0% 0%; }
-}
-
-.ai-mode-bg {
-  background: linear-gradient(135deg,
-    #0D0D0D 0%,
-    #1a0a2e 20%,
-    #0a1a2e 40%,
-    #1a0a1a 60%,
-    #0D0D0D 80%
+.ai-ripple {
+  position: fixed;
+  width: 250vmax;
+  height: 250vmax;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  background: radial-gradient(
+    circle,
+    rgba(168, 85, 247, 0.55) 0%,
+    rgba(6, 182, 212, 0.35) 25%,
+    rgba(236, 72, 153, 0.25) 50%,
+    transparent 70%
   );
-  background-size: 400% 400%;
-  animation: ai-bg-wave 8s ease infinite;
-  transition: background 2s ease;
+  animation: ai-ripple-expand 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-.ai-mode-bg.ai-mode-exit {
-  animation: none;
-  background: #0D0D0D;
-  transition: background 2s ease;
+/* --- Fond aurora animé (orbes flottantes) --- */
+@keyframes ai-orb-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(6vw, -4vh) scale(1.08); }
+  66%       { transform: translate(-3vw, 6vh) scale(0.95); }
+}
+@keyframes ai-orb-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1.05); }
+  40%       { transform: translate(-7vw, -5vh) scale(0.92); }
+  70%       { transform: translate(4vw, 3vh) scale(1.1); }
+}
+@keyframes ai-orb-float-3 {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  35%       { transform: translate(calc(-50% + 8vw), calc(-50% - 5vh)) scale(1.12); }
+  65%       { transform: translate(calc(-50% - 5vw), calc(-50% + 4vh)) scale(0.9); }
 }
 
+.ai-aurora-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ai-orb-1 {
+  position: absolute;
+  width: 55vw;
+  height: 55vh;
+  top: -15%;
+  left: -10%;
+  border-radius: 50%;
+  background: rgba(168, 85, 247, 0.22);
+  filter: blur(70px);
+  animation: ai-orb-float-1 14s ease-in-out infinite;
+}
+.ai-orb-2 {
+  position: absolute;
+  width: 65vw;
+  height: 45vh;
+  bottom: -15%;
+  right: -10%;
+  border-radius: 50%;
+  background: rgba(6, 182, 212, 0.17);
+  filter: blur(80px);
+  animation: ai-orb-float-2 17s ease-in-out infinite 3s;
+}
+.ai-orb-3 {
+  position: absolute;
+  width: 45vw;
+  height: 50vh;
+  top: 50%;
+  left: 40%;
+  border-radius: 50%;
+  background: rgba(236, 72, 153, 0.14);
+  filter: blur(65px);
+  animation: ai-orb-float-3 20s ease-in-out infinite 7s;
+}
+
+/* --- Root background en mode AI --- */
+.ai-mode-active {
+  background: #04000f !important;
+}
+
+/* --- Contenu au-dessus de l'aurora --- */
+.ai-content-layer {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Cards glassmorphism --- */
+@keyframes ai-card-border {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255,255,255,0.04); }
+  33%       { box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.5),  0 0 20px rgba(6, 182, 212, 0.15),  inset 0 1px 0 rgba(255,255,255,0.04); }
+  66%       { box-shadow: 0 0 0 1px rgba(236, 72, 153, 0.5), 0 0 20px rgba(236, 72, 153, 0.15), inset 0 1px 0 rgba(255,255,255,0.04); }
+}
 .ai-mode-card {
-  animation: ai-border-pulse 3s ease-in-out infinite;
+  background: rgba(10, 3, 22, 0.38) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border-color: transparent !important;
+  animation: ai-card-border 4s ease-in-out infinite !important;
 }
+.ai-mode-card:hover {
+  background: rgba(15, 5, 32, 0.52) !important;
+}
+
+/* --- Sidebar glassmorphism --- */
+.ai-mode-sidebar {
+  background: rgba(6, 1, 16, 0.6) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border-right-color: rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 2px 0 24px rgba(168, 85, 247, 0.1) !important;
+}
+
+/* --- Stats bar glassmorphism --- */
+.ai-mode-statsbar {
+  background: rgba(8, 2, 20, 0.55) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(168, 85, 247, 0.2) !important;
+}
+
+/* --- Inputs neon en mode AI --- */
+.ai-mode-active .fmc-input {
+  background: rgba(8, 2, 20, 0.65) !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+}
+.ai-mode-active .fmc-input:focus {
+  border-color: rgba(168, 85, 247, 0.75) !important;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.4), 0 0 14px rgba(168, 85, 247, 0.2) !important;
+}
+
+/* --- Scrollbar neon en mode AI --- */
+.ai-mode-active ::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.55) !important;
+}
+.ai-mode-active ::-webkit-scrollbar-track {
+  background: rgba(4, 0, 15, 0.8) !important;
+}
+
+/* --- Checkbox neon en mode AI --- */
+.ai-mode-active input[type="checkbox"]:checked {
+  background: rgb(168, 85, 247) !important;
+  border-color: rgb(168, 85, 247) !important;
+}
+.ai-mode-active input[type="checkbox"]:hover {
+  border-color: rgba(168, 85, 247, 0.7) !important;
+}
+
+/* --- fmc-panel en mode AI --- */
+.ai-mode-active .fmc-panel {
+  background: rgba(8, 2, 20, 0.5) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+/* --- Buttons en mode AI --- */
+.ai-mode-active .fmc-btn-primary {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.8), rgba(6, 182, 212, 0.7)) !important;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.4) !important;
+}
+
+/* Ancien (compatibilité) */
+.ai-mode-bg { background: #04000f; }

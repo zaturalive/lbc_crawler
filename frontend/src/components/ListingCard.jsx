@@ -110,7 +110,7 @@ const KEYWORD_VARIANTS = {
   'Premier propriétaire':'purple',
 };
 
-export default function ListingCard({ listing, onOpenModal, isLiked = false, onToggleLike, aiMode = false }) {
+export default function ListingCard({ listing, onOpenModal, isLiked = false, onToggleLike, aiMode = false, aiAnalysis = null }) {
   const { title, price, year, mileage, location, url, matched_keywords, vehicle, gearbox, horsepower, fuel_type, doors, seats, color } = listing;
   const [galleryOpen, setGalleryOpen] = useState(false);
 
@@ -204,6 +204,33 @@ export default function ListingCard({ listing, onOpenModal, isLiked = false, onT
         <div className="fmc-divider pt-3">
           <VehicleScore vehicle={vehicle} />
         </div>
+
+        {/* Mini résultat IA */}
+        {aiAnalysis?.reponse && (
+          <div className={`mt-2 p-2 rounded border text-xs font-mono space-y-1 ${
+            aiAnalysis.reponse.risk_level === 'low'
+              ? 'bg-green-950/40 border-green-700/40 text-green-300'
+              : aiAnalysis.reponse.risk_level === 'high'
+              ? 'bg-red-950/40 border-red-700/40 text-red-300'
+              : 'bg-yellow-950/40 border-yellow-700/40 text-yellow-300'
+          }`}>
+            <div className="flex items-center gap-2">
+              <span>{aiAnalysis.reponse.risk_level === 'low' ? '✅' : aiAnalysis.reponse.risk_level === 'high' ? '⚠️' : '⚡'}</span>
+              <span className="font-semibold">
+                {aiAnalysis.reponse.risk_level === 'low' ? 'Bon état' : aiAnalysis.reponse.risk_level === 'high' ? 'Risque élevé' : 'Attention'}
+              </span>
+              {aiAnalysis.cached && <span className="ml-auto text-cyan-400 text-[10px]">⚡ cache</span>}
+            </div>
+            {aiAnalysis.reponse.condition_summary && (
+              <p className="text-[11px] leading-relaxed opacity-80 line-clamp-3">{aiAnalysis.reponse.condition_summary}</p>
+            )}
+            {aiAnalysis.reponse.upcoming_maintenance?.length > 0 && (
+              <div className="text-[10px] opacity-70">
+                🔧 {aiAnalysis.reponse.upcoming_maintenance.slice(0, 2).join(' · ')}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-2 pt-1">
