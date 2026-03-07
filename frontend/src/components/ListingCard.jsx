@@ -1,8 +1,103 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import VehicleScore from './VehicleScore';
 import Badge from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
-import { ExternalLink, MapPin, Gauge, Calendar, Zap, Fuel, Heart, DoorOpen, Users, Palette, Settings2 } from 'lucide-react';
+import { ExternalLink, MapPin, Gauge, Calendar, Zap, Fuel, Heart, DoorOpen, Users, Palette, Settings2, ChevronLeft, ChevronRight, X } from 'lucide-react';
+
+function ImageCarousel({ images, title, onClose }) {
+  const [idx, setIdx] = useState(0);
+
+  const prev = useCallback(() => setIdx(i => (i - 1 + images.length) % images.length), [images.length]);
+  const next = useCallback(() => setIdx(i => (i + 1) % images.length), [images.length]);
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'ArrowLeft')  prev();
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'Escape')     onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [prev, next, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Header */}
+      <div className="w-full max-w-4xl flex items-center justify-between mb-3" onClick={e => e.stopPropagation()}>
+        <span className="text-white/70 font-mono text-sm truncate max-w-xs">{title}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-white/50 font-mono text-xs">{idx + 1} / {images.length}</span>
+          <button
+            onClick={onClose}
+            className="text-white/60 hover:text-red-400 transition-colors p-1 rounded"
+            aria-label="Fermer"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Image + arrows */}
+      <div
+        className="relative w-full max-w-4xl flex items-center justify-center"
+        onClick={e => e.stopPropagation()}
+      >
+        {images.length > 1 && (
+          <button
+            onClick={prev}
+            className="absolute left-0 z-10 p-2 bg-black/60 hover:bg-fmc-accent-deep/80 text-white rounded-r-lg transition-colors"
+            aria-label="Image précédente"
+          >
+            <ChevronLeft className="h-7 w-7" />
+          </button>
+        )}
+
+        <img
+          src={images[idx]}
+          alt={`${title} — photo ${idx + 1}`}
+          className="max-h-[70vh] max-w-full object-contain rounded-lg shadow-2xl"
+          onClick={() => window.open(images[idx], '_blank')}
+          style={{ cursor: 'zoom-in' }}
+        />
+
+        {images.length > 1 && (
+          <button
+            onClick={next}
+            className="absolute right-0 z-10 p-2 bg-black/60 hover:bg-fmc-accent-deep/80 text-white rounded-l-lg transition-colors"
+            aria-label="Image suivante"
+          >
+            <ChevronRight className="h-7 w-7" />
+          </button>
+        )}
+      </div>
+
+      {/* Thumbnails strip */}
+      {images.length > 1 && (
+        <div
+          className="flex gap-2 mt-4 overflow-x-auto max-w-4xl pb-1"
+          onClick={e => e.stopPropagation()}
+        >
+          {images.map((img, i) => (
+            <img
+              key={i}
+              src={img}
+              alt={`Miniature ${i + 1}`}
+              onClick={() => setIdx(i)}
+              className={`h-14 w-20 object-cover rounded cursor-pointer flex-shrink-0 transition-all duration-150 ${
+                i === idx ? 'ring-2 ring-fmc-accent opacity-100' : 'opacity-50 hover:opacity-80'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      <p className="text-white/30 font-mono text-xs mt-3">← → pour naviguer · clic image = plein écran · Échap pour fermer</p>
+    </div>
+  );
+}
 
 function formatMileage(km) {
   if (!km) return null;
@@ -133,32 +228,13 @@ export default function ListingCard({ listing, onOpenModal, isLiked = false, onT
       </CardContent>
     </Card>
 
-    {/* Gallery lightbox */}
-    {galleryOpen && listing.images && (
-      <div
-        className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-        onClick={() => setGalleryOpen(false)}
-      >
-        <div className="relative max-w-4xl w-full" onClick={e => e.stopPropagation()}>
-          <button
-            className="absolute -top-10 right-0 text-white font-mono text-sm hover:text-red-400"
-            onClick={() => setGalleryOpen(false)}
-          >
-            ✕ Fermer
-          </button>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {listing.images.map((img, i) => (
-              <img
-                key={i}
-                src={img}
-                alt={`Photo ${i + 1}`}
-                className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90"
-                onClick={() => window.open(img, '_blank')}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+    {/* Image carousel */}
+    {galleryOpen && listing.images?.length > 0 && (
+      <ImageCarousel
+        images={listing.images}
+        title={listing.title}
+        onClose={() => setGalleryOpen(false)}
+      />
     )}
     </>
   );
