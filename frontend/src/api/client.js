@@ -11,7 +11,9 @@ async function request(method, path, body, token) {
   if (!res.ok) {
     let msg = `Erreur ${res.status}`;
     try { msg = (await res.json()).detail || msg; } catch (_) {}
-    throw new Error(msg);
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
   }
   if (res.status === 204) return null;
   return res.json();
@@ -36,6 +38,8 @@ export const getMe       = (token) => request('GET', '/auth/me', undefined, toke
 export const getSavedSearches = (token) => request('GET', '/users/me/searches', undefined, token);
 
 export const analyzeListingAI = (listingId) => request('POST', `/listings/${listingId}/analyze`);
+
+export const getAiQuota = () => request('GET', '/ai/quota');
 
 export const analyzeSearch = (searchHistoryId) => request('POST', `/search/${searchHistoryId}/analyze`);
 

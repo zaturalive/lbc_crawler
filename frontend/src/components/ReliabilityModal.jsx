@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, ExternalLink, AlertTriangle } from 'lucide-react';
 import Badge from './ui/Badge';
-import { analyzeListingAI } from '../api/client';
+import { analyzeListingAI, getAiQuota } from '../api/client';
 
 function parseIssue(issue) {
   const clean = issue.replace(/[\t\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
@@ -73,6 +73,19 @@ export default function ReliabilityModal({ listing, onClose }) {
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
+  const [aiQuota, setAiQuota] = useState(null);
+
+  // Charge le quota IA au montage (silencieux si indisponible)
+  useEffect(() => {
+    getAiQuota().then(setAiQuota).catch(() => {});
+  }, []);
+
+  // Auto-dismiss du toast d'erreur après 5s
+  useEffect(() => {
+    if (!aiError) return;
+    const t = setTimeout(() => setAiError(null), 5000);
+    return () => clearTimeout(t);
+  }, [aiError]);
 
   async function handleAnalyze() {
     if (aiAnalysis?.reponse) return;
@@ -87,7 +100,11 @@ export default function ReliabilityModal({ listing, onClose }) {
         setAiAnalysis(data);
       }
     } catch (err) {
-      setAiError(err.message || 'Analyse IA indisponible');
+      if (err?.status === 429) {
+        setAiError(err.message || 'Quota IA dépassé');
+      } else {
+        setAiError(err.message || 'Analyse IA indisponible');
+      }
     } finally {
       setAiLoading(false);
     }
@@ -154,16 +171,25 @@ export default function ReliabilityModal({ listing, onClose }) {
           ))}
           <button
             onClick={() => { setActiveTab('analyse-ia'); handleAnalyze(); }}
+            disabled={aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max}
             className={`px-4 py-2.5 text-xs font-mono font-semibold transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
-              activeTab === 'analyse-ia'
-                ? 'text-fmc-accent border-fmc-accent'
-                : 'text-fmc-text-dim border-transparent hover:text-fmc-text'
+              aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max
+                ? 'text-zinc-500 border-transparent cursor-not-allowed'
+                : activeTab === 'analyse-ia'
+                  ? 'text-fmc-accent border-fmc-accent'
+                  : 'text-fmc-text-dim border-transparent hover:text-fmc-text'
             }`}
           >
             ✨ Analyse IA
-            <span className="px-1.5 py-0.5 text-xs font-mono rounded-full bg-green-900/30 border border-green-500/50 text-green-400 leading-none">
-              Gratuit
-            </span>
+            {aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max ? (
+              <span className="px-1.5 py-0.5 text-xs font-mono rounded-full bg-red-900/30 border border-red-500/50 text-red-400 leading-none">
+                {aiQuota.listing_analyses_max}/{aiQuota.listing_analyses_max}
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.5 text-xs font-mono rounded-full bg-green-900/30 border border-green-500/50 text-green-400 leading-none">
+                {aiQuota ? `${aiQuota.listing_analyses_used}/${aiQuota.listing_analyses_max}` : 'Gratuit'}
+              </span>
+            )}
           </button>
         </div>
 
@@ -421,12 +447,30 @@ export default function ReliabilityModal({ listing, onClose }) {
                     L'IA va analyser la description de cette annonce pour trouver les réparations effectuées,
                     estimer les prochaines révisions et évaluer le risque.
                   </p>
-                  <button
-                    onClick={handleAnalyze}
-                    className="fmc-btn-primary text-sm px-6 py-2"
-                  >
-                    ✨ Lancer l'analyse IA
-                  </button>
+                  {aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max ? (
+                    <div className="space-y-2">
+                      <button disabled className="fmc-btn-primary text-sm px-6 py-2 opacity-40 cursor-not-allowed">
+                        ✨ Lancer l'analyse IA
+                      </button>
+                      <p className="text-red-400 text-xs font-mono">
+                        Quota atteint ({aiQuota.listing_analyses_max}/{aiQuota.listing_analyses_max})
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleAnalyze}
+                        className="fmc-btn-primary text-sm px-6 py-2"
+                      >
+                        ✨ Lancer l'analyse IA
+                      </button>
+                      {aiQuota && (
+                        <p className="text-fmc-text-dim text-xs font-mono">
+                          ({aiQuota.listing_analyses_max - aiQuota.listing_analyses_used}/{aiQuota.listing_analyses_max} restantes)
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -438,11 +482,10 @@ export default function ReliabilityModal({ listing, onClose }) {
                 </div>
               )}
 
-              {/* Erreur */}
+              {/* Erreur — toast inline dans la modal */}
               {aiError && (
-                <div className="rounded-md bg-red-900/20 border border-red-500/30 p-4">
-                  <p className="text-red-400 text-xs font-mono">{aiError}</p>
-                  <button onClick={handleAnalyze} className="mt-2 text-xs text-fmc-accent underline">Réessayer</button>
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-red-900/90 border border-red-500/50 text-red-200 font-mono text-sm px-5 py-3 rounded-lg shadow-xl">
+                  {aiError}
                 </div>
               )}
 
@@ -459,6 +502,11 @@ export default function ReliabilityModal({ listing, onClose }) {
                     }`}>
                       {aiAnalysis.reponse?.risk_level === 'low' ? '✓ Faible' : aiAnalysis.reponse?.risk_level === 'high' ? '⚠ Élevé' : '~ Modéré'}
                     </span>
+                    {aiAnalysis.cached && (
+                      <span className="text-xs font-mono px-2 py-0.5 rounded bg-cyan-900/40 border border-cyan-500/40 text-cyan-400">
+                        ⚡ Analyse déjà en cache
+                      </span>
+                    )}
                     {aiAnalysis.model && (
                       <span className="text-xs text-fmc-text-dim font-mono ml-auto opacity-60">via {aiAnalysis.model}</span>
                     )}

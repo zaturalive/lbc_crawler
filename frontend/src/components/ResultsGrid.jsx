@@ -1,13 +1,27 @@
 import { useState, useEffect } from 'react';
 import ListingCard from './ListingCard';
 import ListingsFilterBar from './ListingsFilterBar';
-import { analyzeSearch } from '../api/client';
+import { analyzeSearch, getAiQuota } from '../api/client';
 
 export default function ResultsGrid({ results, loading, onOpenModal, likedIds = [], onToggleLike, aiMode = false, onAiAnalyze, searchHistoryId = null }) {
   const [filteredListings, setFilteredListings] = useState([]);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [aiQuota, setAiQuota] = useState(null);
   const [cols, setCols] = useState(3);
+
+  // Charge le quota IA au montage (silencieux si indisponible)
+  useEffect(() => {
+    getAiQuota().then(setAiQuota).catch(() => {});
+  }, []);
+
+  // Auto-dismiss du toast d'erreur après 5s
+  useEffect(() => {
+    if (!aiError) return;
+    const t = setTimeout(() => setAiError(null), 5000);
+    return () => clearTimeout(t);
+  }, [aiError]);
 
   // Réinitialise les listings filtrés à chaque nouvelle recherche
   useEffect(() => {
@@ -23,7 +37,11 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
       const data = await analyzeSearch(searchHistoryId);
       setAiAnalysis(data);
     } catch (e) {
-      console.error('AI analyze failed:', e);
+      if (e?.status === 429) {
+        setAiError(e?.message || 'Quota IA dépassé');
+      } else {
+        console.error('AI analyze failed:', e);
+      }
     } finally {
       setAiLoading(false);
       setTimeout(() => onAiAnalyze && onAiAnalyze(false), 2000);
@@ -92,26 +110,45 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
           ))}
         </div>
 
-        {searchHistoryId && !aiAnalysis && (
-          <button
-            onClick={handleAiAnalyze}
-            disabled={aiLoading}
-            className={`flex items-center gap-2 px-3 py-1 rounded font-mono text-xs transition-all duration-300 ${
-              aiLoading
-                ? 'bg-purple-900/50 text-purple-300 border border-purple-500/50 animate-pulse cursor-wait'
-                : 'bg-gradient-to-r from-purple-900/40 to-cyan-900/40 text-purple-300 border border-purple-500/40 hover:border-purple-400/70 hover:text-purple-200'
-            }`}
-          >
-            {aiLoading ? '⏳ Analyse en cours...' : '✨ Analyse IA'}
-          </button>
-        )}
+        {searchHistoryId && !aiAnalysis && (() => {
+          const quotaReached = aiQuota && aiQuota.search_analyses_used >= aiQuota.search_analyses_max;
+          return (
+            <div className="flex flex-col items-end gap-0.5">
+              <button
+                onClick={handleAiAnalyze}
+                disabled={aiLoading || quotaReached}
+                className={`flex items-center gap-2 px-3 py-1 rounded font-mono text-xs transition-all duration-300 ${
+                  quotaReached
+                    ? 'bg-zinc-800/60 text-zinc-500 border border-zinc-600/40 cursor-not-allowed'
+                    : aiLoading
+                      ? 'bg-purple-900/50 text-purple-300 border border-purple-500/50 animate-pulse cursor-wait'
+                      : 'bg-gradient-to-r from-purple-900/40 to-cyan-900/40 text-purple-300 border border-purple-500/40 hover:border-purple-400/70 hover:text-purple-200'
+                }`}
+              >
+                {quotaReached ? '✨ Quota atteint' : aiLoading ? '⏳ Analyse en cours...' : '✨ Analyse IA'}
+              </button>
+              {aiQuota && (
+                <span className="text-fmc-text-dim text-xs font-mono">
+                  ({aiQuota.search_analyses_used}/{aiQuota.search_analyses_max} utilisées)
+                </span>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* AI analysis panel */}
       {aiAnalysis?.reponse && (
         <div className="fmc-panel p-4 space-y-3 border border-purple-500/30 bg-purple-950/20 animate-fade-in">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-mono font-bold text-purple-300">✨ Analyse IA de la recherche</h3>
+            <h3 className="text-sm font-mono font-bold text-purple-300 flex items-center gap-2">
+              ✨ Analyse IA de la recherche
+              {aiAnalysis?.cached && (
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-cyan-900/40 border border-cyan-500/40 text-cyan-400">
+                  ⚡ Analyse en cache
+                </span>
+              )}
+            </h3>
             <div className="flex items-center gap-2">
               <span className={`text-xs font-mono px-2 py-0.5 rounded ${
                 aiAnalysis.reponse.risk_level === 'low' ? 'bg-green-900/40 text-green-400 border border-green-500/40' :
@@ -178,6 +215,13 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
           />
         ))}
       </div>
+
+      {/* Toast erreur quota IA */}
+      {aiError && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-red-900/90 border border-red-500/50 text-red-200 font-mono text-sm px-5 py-3 rounded-lg shadow-xl">
+          {aiError}
+        </div>
+      )}
     </div>
   );
 }
