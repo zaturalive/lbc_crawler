@@ -134,6 +134,7 @@ class RequeteIA(Base):
 
     id          = Column(Integer, primary_key=True)
     listing_id  = Column(Integer, ForeignKey("listings.id"), nullable=False)
+    user_id     = Column(Integer, nullable=True)
     prompt_text = Column(Text, nullable=False)        # prompt complet envoyé au LLM
     model       = Column(String(100), nullable=False)  # ex: "gpt-4o-mini"
     status      = Column(String(20), default="pending")  # pending | done | error
@@ -163,6 +164,7 @@ class AnalyseRecherche(Base):
 
     id          = Column(Integer, primary_key=True)
     search_id   = Column(Integer, ForeignKey("search_history.id", ondelete="CASCADE"), nullable=False, unique=True)
+    user_id     = Column(Integer, nullable=True)
     listing_ids = Column(JSON, nullable=False)   # list[int] des listings analyses
     prompt_text = Column(Text, nullable=False)
     model       = Column(String(100), nullable=False)

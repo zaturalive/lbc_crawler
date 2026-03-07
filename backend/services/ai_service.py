@@ -10,7 +10,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_MODEL = os.getenv("GITHUB_MODEL", "gpt-4o-mini")
 GITHUB_MODELS_URL = "https://models.inference.ai.azure.com/chat/completions"
 
-SYSTEM_PROMPT = """Tu es un expert automobile. Analyse la description d'une annonce de voiture d'occasion.
+_BASE_SYSTEM_PROMPT = """Tu es un expert automobile. Analyse la description d'une annonce de voiture d'occasion.
 
 Extrais et retourne un JSON structuré avec ces 4 champs EXACTEMENT:
 - repairs_found: liste des réparations/interventions déjà effectuées mentionnées dans l'annonce (liste de strings, vide si aucune)
@@ -19,6 +19,43 @@ Extrais et retourne un JSON structuré avec ces 4 champs EXACTEMENT:
 - risk_level: niveau de risque global: "low" (bon état, entretenu) | "medium" (état correct, quelques points d'attention) | "high" (risques importants, réparations majeures à prévoir)
 
 Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication, sans texte autour."""
+
+_RELIABILITY_CONTEXT_TEMPLATE = """
+CONTEXTE FIABILITÉ DU MODÈLE:
+Problèmes connus sur ce modèle : {known_issues}
+Défauts récurrents signalés : {common_issues}
+
+Lors de ton analyse:
+- Si le vendeur mentionne avoir réglé un problème connu → signale-le positivement dans repairs_found
+- Si un problème connu n'est PAS mentionné dans l'annonce → signale le risque potentiel dans upcoming_maintenance
+- Si le vendeur mentionne un "carnet d'entretien" → ne présume pas de l'état, dis plutôt "Demandez à consulter le carnet d'entretien pour vérifier X"
+- Pour les révisions : détecte si une révision est mentionnée avec une date/km → évalue si elle est récente (< 20 000 km ou < 2 ans) ou à refaire"""
+
+
+def build_system_prompt(known_issues=None, common_issues=None) -> str:
+    """Build the system prompt, optionally enriched with vehicle reliability context."""
+    prompt = _BASE_SYSTEM_PROMPT
+    has_known = known_issues and (
+        (isinstance(known_issues, list) and len(known_issues) > 0)
+        or (isinstance(known_issues, str) and known_issues.strip())
+    )
+    has_common = common_issues and (
+        (isinstance(common_issues, list) and len(common_issues) > 0)
+        or (isinstance(common_issues, str) and common_issues.strip())
+    )
+    if has_known or has_common:
+        known_str = (
+            ", ".join(known_issues) if isinstance(known_issues, list) else (known_issues or "Non renseigné")
+        )
+        common_str = (
+            ", ".join(common_issues) if isinstance(common_issues, list) else (common_issues or "Non renseigné")
+        )
+        prompt += _RELIABILITY_CONTEXT_TEMPLATE.format(
+            known_issues=known_str,
+            common_issues=common_str,
+        )
+    return prompt
+
 
 USER_PROMPT_TEMPLATE = """Annonce de voiture d'occasion à analyser:
 
@@ -30,20 +67,37 @@ Prix: {price} €
 Description du vendeur:
 {description}
 
+DÉTECTION RÉVISION: Si la description mentionne une révision avec date ou kilométrage, indique dans upcoming_maintenance si elle est récente ou à refaire sous peu (intervalles typiques: révision toutes les 30 000 km ou 2 ans pour la plupart des modèles).
+
 Analyse cette annonce et retourne le JSON structuré demandé."""
 
 
-def build_prompt(title: str, description: str, mileage=None, year=None, price=None) -> str:
-    return USER_PROMPT_TEMPLATE.format(
+def build_prompt(
+    title: str,
+    description: str,
+    mileage=None,
+    year=None,
+    price=None,
+    known_issues=None,
+    common_issues=None,
+) -> tuple[str, str]:
+    """Return (user_prompt, system_prompt) for the listing analysis.
+
+    The system prompt is enriched with vehicle reliability context when
+    known_issues or common_issues are provided.
+    """
+    user_prompt = USER_PROMPT_TEMPLATE.format(
         title=title or "Non renseigné",
         mileage=mileage or "?",
         year=year or "?",
         price=price or "?",
         description=description or "Pas de description disponible.",
     )
+    system_prompt = build_system_prompt(known_issues=known_issues, common_issues=common_issues)
+    return user_prompt, system_prompt
 
 
-async def call_github_models(prompt_text: str) -> dict:
+async def call_github_models(prompt_text: str, system_prompt: Optional[str] = None) -> dict:
     """Call GitHub Models API (gpt-4o-mini via GITHUB_TOKEN)."""
     import httpx
 
@@ -52,6 +106,8 @@ async def call_github_models(prompt_text: str) -> dict:
             "GITHUB_TOKEN non configuré. "
             "Ajoute GITHUB_TOKEN dans ton .env (le même token GitHub que pour CI/CD)."
         )
+
+    effective_system = system_prompt if system_prompt is not None else _BASE_SYSTEM_PROMPT
 
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
@@ -63,7 +119,7 @@ async def call_github_models(prompt_text: str) -> dict:
             json={
                 "model": GITHUB_MODEL,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": effective_system},
                     {"role": "user", "content": prompt_text},
                 ],
                 "temperature": 0.3,

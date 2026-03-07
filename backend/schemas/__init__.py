@@ -171,6 +171,7 @@ class RequeteIAOut(BaseModel):
     created_at: Optional[datetime] = None
     reponse: Optional[ReponseIAOut] = None
     is_premium: bool = False
+    cached: bool = False
 
     model_config = {"from_attributes": True}
 
