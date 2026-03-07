@@ -83,7 +83,10 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
     try:
         history_entry = SearchHistory(
             user_id=1,
-            params={k: v for k, v in req.__dict__.items() if v is not None and k != "limit"},
+            params={
+                **{k: v for k, v in req.__dict__.items() if v is not None and k != "limit"},
+                "listing_ids": [l.id for l in upserted],
+            },
             result_count=len(upserted),
         )
         db.add(history_entry)
@@ -174,6 +177,7 @@ async def _upsert_listing(raw: dict, vehicle_id: Optional[int], db: AsyncSession
             description=raw.get("description"),
             url=raw.get("url"),
             matched_keywords=raw.get("matched_keywords", []),
+            images=raw.get("images", []),
             vehicle_id=vehicle_id,
         )
         .on_duplicate_key_update(
@@ -186,6 +190,7 @@ async def _upsert_listing(raw: dict, vehicle_id: Optional[int], db: AsyncSession
             color=raw.get("color"),
             location=raw.get("location"),
             matched_keywords=raw.get("matched_keywords", []),
+            images=raw.get("images", []),
             vehicle_id=vehicle_id,
         )
     )

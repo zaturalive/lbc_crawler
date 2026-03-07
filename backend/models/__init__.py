@@ -50,6 +50,7 @@ class Listing(Base):
     description      = Column(Text)
     url              = Column(String(500))
     matched_keywords = Column(JSON)
+    images           = Column(JSON, nullable=True)  # list of image URLs from LBC
     vehicle_id       = Column(Integer, ForeignKey("vehicles.id", ondelete="SET NULL"))
     scraped_at       = Column(DateTime, server_default=func.now())
 
@@ -155,3 +156,33 @@ class ReponseIA(Base):
     created_at           = Column(DateTime, default=func.now())
 
     requete = relationship("RequeteIA", back_populates="reponse")
+
+
+class AnalyseRecherche(Base):
+    __tablename__ = "analyse_recherche"
+
+    id          = Column(Integer, primary_key=True)
+    search_id   = Column(Integer, ForeignKey("search_history.id", ondelete="CASCADE"), nullable=False, unique=True)
+    listing_ids = Column(JSON, nullable=False)   # list[int] des listings analyses
+    prompt_text = Column(Text, nullable=False)
+    model       = Column(String(100), nullable=False)
+    status      = Column(String(20), default="pending")  # pending | done | error
+    created_at  = Column(DateTime, default=func.now())
+
+    reponse = relationship("ReponseRechercheIA", back_populates="analyse", uselist=False, lazy="selectin")
+
+
+class ReponseRechercheIA(Base):
+    __tablename__ = "reponse_recherche_ia"
+
+    id                     = Column(Integer, primary_key=True)
+    analyse_id             = Column(Integer, ForeignKey("analyse_recherche.id"), nullable=False, unique=True)
+    synthese_globale       = Column(Text)
+    themes_mentionnes      = Column(JSON)    # list[str]
+    themes_absents         = Column(JSON)    # list[str]
+    prochaines_reparations = Column(JSON)    # list[str]
+    risk_level             = Column(String(20))   # "low" | "medium" | "high"
+    raw_response           = Column(Text)
+    created_at             = Column(DateTime, default=func.now())
+
+    analyse = relationship("AnalyseRecherche", back_populates="reponse")

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import VehicleScore from './VehicleScore';
 import Badge from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
@@ -14,15 +15,42 @@ const KEYWORD_VARIANTS = {
   'Premier propriétaire':'purple',
 };
 
-export default function ListingCard({ listing, onOpenModal, isLiked = false, onToggleLike }) {
+export default function ListingCard({ listing, onOpenModal, isLiked = false, onToggleLike, aiMode = false }) {
   const { title, price, year, mileage, location, url, matched_keywords, vehicle, gearbox, horsepower, fuel_type, doors, seats, color } = listing;
+  const [galleryOpen, setGalleryOpen] = useState(false);
 
   return (
+    <>
     <Card
-      className="group animate-fade-in relative"
+      className={`group animate-fade-in relative ${aiMode ? 'ai-mode-card' : ''}`}
       onClick={() => onOpenModal && onOpenModal(listing)}
     >
       <CardContent className="space-y-3">
+
+        {/* Thumbnail image */}
+        {listing.images && listing.images.length > 0 && (
+          <div className="relative -mx-4 -mt-4 mb-3 overflow-hidden rounded-t-lg" style={{height: '140px'}}>
+            <img
+              src={listing.images[0]}
+              alt={listing.title}
+              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+              onClick={e => { e.stopPropagation(); setGalleryOpen(true); }}
+              onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
+            />
+            {listing.images.length > 1 && (
+              <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs font-mono px-1.5 py-0.5 rounded">
+                +{listing.images.length - 1}
+              </span>
+            )}
+            <button
+              className="absolute inset-0 w-full h-full opacity-0 hover:opacity-100 bg-black/30 flex items-center justify-center transition-opacity duration-200"
+              onClick={e => { e.stopPropagation(); setGalleryOpen(true); }}
+              aria-label="Voir toutes les photos"
+            >
+              <span className="text-white font-mono text-sm bg-black/60 px-3 py-1 rounded">📷 Voir photos</span>
+            </button>
+          </div>
+        )}
 
         {/* Bouton like — positionné en haut à droite */}
         <button
@@ -104,5 +132,34 @@ export default function ListingCard({ listing, onOpenModal, isLiked = false, onT
 
       </CardContent>
     </Card>
+
+    {/* Gallery lightbox */}
+    {galleryOpen && listing.images && (
+      <div
+        className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+        onClick={() => setGalleryOpen(false)}
+      >
+        <div className="relative max-w-4xl w-full" onClick={e => e.stopPropagation()}>
+          <button
+            className="absolute -top-10 right-0 text-white font-mono text-sm hover:text-red-400"
+            onClick={() => setGalleryOpen(false)}
+          >
+            ✕ Fermer
+          </button>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {listing.images.map((img, i) => (
+              <img
+                key={i}
+                src={img}
+                alt={`Photo ${i + 1}`}
+                className="w-full h-48 object-cover rounded-lg cursor-pointer hover:opacity-90"
+                onClick={() => window.open(img, '_blank')}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

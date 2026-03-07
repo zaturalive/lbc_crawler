@@ -37,6 +37,7 @@ class ListingResponse(BaseModel):
     vehicle: Optional[VehicleResponse] = None
     scraped_at: Optional[datetime]
     is_liked: Optional[bool] = False
+    images: Optional[list[str]] = None
 
     model_config = {"from_attributes": True}
 
@@ -169,5 +170,30 @@ class RequeteIAOut(BaseModel):
     created_at: Optional[datetime] = None
     reponse: Optional[ReponseIAOut] = None
     is_premium: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class ReponseRechercheIAOut(BaseModel):
+    id: int
+    analyse_id: int
+    synthese_globale: Optional[str] = None
+    themes_mentionnes: Optional[list[str]] = None
+    themes_absents: Optional[list[str]] = None
+    prochaines_reparations: Optional[list[str]] = None
+    risk_level: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AnalyseRechercheOut(BaseModel):
+    id: int
+    search_id: int
+    listing_ids: Optional[list[int]] = None
+    model: str
+    status: str
+    created_at: Optional[datetime] = None
+    reponse: Optional[ReponseRechercheIAOut] = None
 
     model_config = {"from_attributes": True}

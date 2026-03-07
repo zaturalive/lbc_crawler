@@ -356,6 +356,7 @@ class LBCScraper:
             "description": description,
             "url": str(getattr(ad, "url", "") or ""),
             "matched_keywords": matched_keywords,
+            "images": list(getattr(ad, "images", []) or []),
             "brand": brand,
             "model": model,
         }
