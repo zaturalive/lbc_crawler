@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from db.database import create_tables
 from routers import admin, listings, patterns, search, vehicles
+from routers.history import router as history_router
 from routers.analysis import router as analysis_router
 from routers.auth import router as auth_router
 from routers.likes import router as likes_router
@@ -38,6 +39,7 @@ app.include_router(likes_router, tags=["likes"])
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(analysis_router)
+app.include_router(history_router)
 
 
 @app.get("/health")

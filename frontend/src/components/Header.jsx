@@ -17,6 +17,12 @@ export default function Header() {
         </Link>
 
         <nav className="flex items-center gap-3">
+          <Link
+            to="/history"
+            className="text-xs font-mono text-fmc-text-dim hover:text-fmc-accent transition-colors"
+          >
+            Historique
+          </Link>
           {user ? (
             <>
               <span className="text-xs font-mono text-fmc-text-dim hidden sm:block max-w-[140px] truncate">

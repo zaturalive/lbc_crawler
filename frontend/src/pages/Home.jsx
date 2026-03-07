@@ -13,6 +13,7 @@ export default function Home() {
   const [likedIds, setLikedIds] = useState([]);
   const location = useLocation();
   const initialValues = location.state?.loadSearch || null;
+  const autoSubmit = !!(initialValues && location.state?.autoSubmit);
   const { token } = useAuth();
   const [likeToast, setLikeToast] = useState(false);
 
@@ -26,6 +27,14 @@ export default function Home() {
         .catch(() => {});
     });
   }, []);
+
+  // Ouvre la modal + marque l'annonce comme vue (best-effort)
+  function handleOpenModal(listing) {
+    import('../api/client').then(({ markListingViewed }) => {
+      markListingViewed(listing.id).catch(() => {});
+    });
+    setSelectedListing(listing);
+  }
 
   async function handleToggleLike(listingId) {
     if (!token) {
@@ -76,7 +85,7 @@ export default function Home() {
                 <span className="text-fmc-accent text-xs">◈</span>
                 CRITÈRES DE RECHERCHE
               </h2>
-              <SearchForm onResults={setResults} onLoading={setLoading} initialValues={initialValues} />
+              <SearchForm onResults={setResults} onLoading={setLoading} initialValues={initialValues} autoSubmit={autoSubmit} />
             </div>
           </div>
         </main>
@@ -89,7 +98,7 @@ export default function Home() {
               <span className="text-fmc-accent">◈</span>
               FILTRES
             </h2>
-            <SearchForm onResults={setResults} onLoading={setLoading} initialValues={initialValues} />
+              <SearchForm onResults={setResults} onLoading={setLoading} initialValues={initialValues} autoSubmit={autoSubmit} />
             <button
               onClick={() => setResults(null)}
               className="mt-4 w-full text-xs text-fmc-text-dim hover:text-fmc-text-muted font-mono underline underline-offset-2 transition-colors"
@@ -103,7 +112,7 @@ export default function Home() {
             <ResultsGrid
               results={results}
               loading={loading}
-              onOpenModal={setSelectedListing}
+              onOpenModal={handleOpenModal}
               likedIds={likedIds}
               onToggleLike={handleToggleLike}
             />

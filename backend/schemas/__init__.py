@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -125,6 +125,26 @@ class SearchSessionResponse(BaseModel):
     patterns: Optional[list] = None
     result_count: Optional[int] = None
     created_at: Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+
+class SearchHistoryOut(BaseModel):
+    id: int
+    user_id: int
+    params: dict
+    result_count: int
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ViewedListingOut(BaseModel):
+    id: int
+    user_id: int
+    listing_id: int
+    viewed_at: Optional[datetime] = None
+    listing: Optional[ListingResponse] = None
+
     model_config = {"from_attributes": True}
 
 

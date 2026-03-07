@@ -36,3 +36,9 @@ export const getMe       = (token) => request('GET', '/auth/me', undefined, toke
 export const getSavedSearches = (token) => request('GET', '/users/me/searches', undefined, token);
 
 export const analyzeListingAI = (listingId) => request('POST', `/listings/${listingId}/analyze`);
+
+export const getSearchHistory   = ()    => request('GET',    '/history/searches');
+export const getViewedListings  = ()    => request('GET',    '/history/listings');
+export const markListingViewed  = (id)  => request('POST',   `/history/listings/${id}`);
+export const clearSearchHistory = ()    => request('DELETE', '/history/searches');
+export const clearViewedHistory = ()    => request('DELETE', '/history/listings');

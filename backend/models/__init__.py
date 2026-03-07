@@ -107,6 +107,27 @@ class Like(Base):
     )
 
 
+class SearchHistory(Base):
+    __tablename__ = "search_history"
+
+    id           = Column(Integer, primary_key=True)
+    user_id      = Column(Integer, default=1, nullable=False)
+    params       = Column(JSON, nullable=False)
+    result_count = Column(Integer, default=0)
+    created_at   = Column(DateTime, default=func.now())
+
+
+class ViewedListing(Base):
+    __tablename__ = "viewed_listings"
+
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, default=1, nullable=False)
+    listing_id = Column(Integer, ForeignKey("listings.id"), nullable=False)
+    viewed_at  = Column(DateTime, default=func.now())
+
+    listing = relationship("Listing", lazy="selectin")
+
+
 class RequeteIA(Base):
     __tablename__ = "requete_ia"
 

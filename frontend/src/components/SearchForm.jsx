@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import NumberInput from './ui/NumberInput';
@@ -59,10 +59,11 @@ function loadPresets() {
   catch { return []; }
 }
 
-export default function SearchForm({ onResults, onLoading, initialValues = null }) {
+export default function SearchForm({ onResults, onLoading, initialValues = null, autoSubmit = false }) {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const formRef = useRef(null);
 
   // Presets
   const [presets, setPresets] = useState(loadPresets);
@@ -78,7 +79,11 @@ export default function SearchForm({ onResults, onLoading, initialValues = null 
       Object.entries(initialValues).map(([k, v]) => [k, v == null ? '' : String(v)])
     );
     setForm(prev => ({ ...EMPTY_FORM, ...cleaned }));
-  }, [initialValues]);
+    // Declenchement automatique si demande (ex: "Relancer" depuis l'historique)
+    if (autoSubmit) {
+      setTimeout(() => formRef.current?.requestSubmit(), 150);
+    }
+  }, [initialValues]); // eslint-disable-line
 
   function handleReset() {
     setForm({ ...EMPTY_FORM });
@@ -148,7 +153,7 @@ export default function SearchForm({ onResults, onLoading, initialValues = null 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-2 min-w-0">
           <label className="text-sm font-semibold text-fmc-text">Marque</label>

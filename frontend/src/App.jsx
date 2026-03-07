@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import VerifyEmail from './pages/VerifyEmail';
 import Account from './pages/Account';
+import History from './pages/History';
 import './App.css';
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/account" element={<Account />} />
+          <Route path="/history" element={<History />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

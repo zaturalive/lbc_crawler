@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Listing, RegexPattern, SearchSession, Vehicle
+from models import Listing, RegexPattern, SearchHistory, SearchSession, Vehicle
 from schemas import ListingResponse, SearchRequest, SearchResult, VehicleResponse
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,18 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
     db.add(session)
     await db.commit()
     await db.refresh(session)
+
+    # Save search history (best-effort, don't fail the request)
+    try:
+        history_entry = SearchHistory(
+            user_id=1,
+            params={k: v for k, v in req.__dict__.items() if v is not None and k != "limit"},
+            result_count=len(upserted),
+        )
+        db.add(history_entry)
+        await db.commit()
+    except Exception:
+        pass  # Ne pas faire échouer la recherche pour ca
 
     return SearchResult(session_id=session.id, count=len(upserted), limit=req.limit, listings=upserted)
 
