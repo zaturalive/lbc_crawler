@@ -26,7 +26,9 @@ jobs:
           script: |
             cd ~/find_my_car/infra
             export TAG=${{ github.sha }}
-            export REGISTRY_URL=${{ secrets.REGISTRY_URL }}
+            export GITHUB_OWNER=${{ github.repository_owner }}
+            # Pull new images from ghcr.io
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
             docker image prune -f

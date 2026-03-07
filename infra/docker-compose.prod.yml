@@ -1,8 +1,10 @@
-# Production overrides — image tags pinned to CI SHA
+# Production overrides — image tags from ghcr.io (built by GitHub Actions)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Required env vars: GITHUB_OWNER, TAG (defaults to 'latest')
 services:
   frontend:
-    image: ${REGISTRY_URL}/fmc-frontend:${TAG}
+    image: ghcr.io/${GITHUB_OWNER}/fmc-frontend:${TAG:-latest}
   backend:
-    image: ${REGISTRY_URL}/fmc-backend:${TAG}
+    image: ghcr.io/${GITHUB_OWNER}/fmc-backend:${TAG:-latest}
   scraper:
-    image: ${REGISTRY_URL}/fmc-scraper:${TAG}
+    image: ghcr.io/${GITHUB_OWNER}/fmc-scraper:${TAG:-latest}
