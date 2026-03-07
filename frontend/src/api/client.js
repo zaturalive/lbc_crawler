@@ -37,6 +37,8 @@ export const getSavedSearches = (token) => request('GET', '/users/me/searches', 
 
 export const analyzeListingAI = (listingId) => request('POST', `/listings/${listingId}/analyze`);
 
+export const analyzeSearch = (searchHistoryId) => request('POST', `/search/${searchHistoryId}/analyze`);
+
 export const getSearchHistory   = ()    => request('GET',    '/history/searches');
 export const getViewedListings  = ()    => request('GET',    '/history/listings');
 export const markListingViewed  = (id)  => request('POST',   `/history/listings/${id}`);

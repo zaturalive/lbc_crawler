@@ -65,6 +65,7 @@ class SearchRequest(BaseModel):
 
 class SearchResult(BaseModel):
     session_id: int
+    history_id: Optional[int] = None
     count: int
     limit: int
     listings: list[ListingResponse]

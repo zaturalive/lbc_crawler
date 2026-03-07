@@ -279,3 +279,46 @@ input[type="checkbox"]:checked::after {
   border-left: none;
   transform: rotate(45deg);
 }
+
+
+/* ===================== AI Mode animations ===================== */
+@keyframes ai-gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes ai-border-pulse {
+  0%, 100% { border-color: rgba(168, 85, 247, 0.5); box-shadow: 0 0 8px rgba(168, 85, 247, 0.3); }
+  33%       { border-color: rgba(6, 182, 212, 0.5);  box-shadow: 0 0 8px rgba(6, 182, 212, 0.3); }
+  66%       { border-color: rgba(236, 72, 153, 0.5); box-shadow: 0 0 8px rgba(236, 72, 153, 0.3); }
+}
+
+@keyframes ai-bg-wave {
+  0%   { background-position: 0% 0%; }
+  50%  { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+.ai-mode-bg {
+  background: linear-gradient(135deg,
+    #0D0D0D 0%,
+    #1a0a2e 20%,
+    #0a1a2e 40%,
+    #1a0a1a 60%,
+    #0D0D0D 80%
+  );
+  background-size: 400% 400%;
+  animation: ai-bg-wave 8s ease infinite;
+  transition: background 2s ease;
+}
+
+.ai-mode-bg.ai-mode-exit {
+  animation: none;
+  background: #0D0D0D;
+  transition: background 2s ease;
+}
+
+.ai-mode-card {
+  animation: ai-border-pulse 3s ease-in-out infinite;
+}

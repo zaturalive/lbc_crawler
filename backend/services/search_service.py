@@ -80,6 +80,7 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
     await db.refresh(session)
 
     # Save search history (best-effort, don't fail the request)
+    history_id = None
     try:
         history_entry = SearchHistory(
             user_id=1,
@@ -91,10 +92,12 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
         )
         db.add(history_entry)
         await db.commit()
+        await db.refresh(history_entry)
+        history_id = history_entry.id
     except Exception:
         pass  # Ne pas faire échouer la recherche pour ca
 
-    return SearchResult(session_id=session.id, count=len(upserted), limit=req.limit, listings=upserted)
+    return SearchResult(session_id=session.id, history_id=history_id, count=len(upserted), limit=req.limit, listings=upserted)
 
 
 async def _call_scraper(payload: dict) -> list[dict]:

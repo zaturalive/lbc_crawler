@@ -11,6 +11,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [selectedListing, setSelectedListing] = useState(null);
   const [likedIds, setLikedIds] = useState([]);
+  const [aiMode, setAiMode] = useState(false);
+  const [searchHistoryId, setSearchHistoryId] = useState(null);
   const location = useLocation();
   const initialValues = location.state?.loadSearch || null;
   const autoSubmit = !!(initialValues && location.state?.autoSubmit);
@@ -27,6 +29,11 @@ export default function Home() {
         .catch(() => {});
     });
   }, []);
+
+  function handleResults(data) {
+    setResults(data);
+    setSearchHistoryId(data?.history_id || null);
+  }
 
   // Ouvre la modal + marque l'annonce comme vue (best-effort)
   function handleOpenModal(listing) {
@@ -62,7 +69,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-fmc-bg">
+    <div className={`flex flex-col h-full transition-all duration-1000 ${aiMode ? 'ai-mode-bg' : 'bg-fmc-bg'}`}>
       <Header />
 
       {/* LAYOUT: centered form when no results, split scroll when results */}
@@ -85,7 +92,7 @@ export default function Home() {
                 <span className="text-fmc-accent text-xs">◈</span>
                 CRITÈRES DE RECHERCHE
               </h2>
-              <SearchForm onResults={setResults} onLoading={setLoading} initialValues={initialValues} autoSubmit={autoSubmit} />
+              <SearchForm onResults={handleResults} onLoading={setLoading} initialValues={initialValues} autoSubmit={autoSubmit} />
             </div>
           </div>
         </main>
@@ -98,7 +105,7 @@ export default function Home() {
               <span className="text-fmc-accent">◈</span>
               FILTRES
             </h2>
-              <SearchForm onResults={setResults} onLoading={setLoading} initialValues={initialValues} autoSubmit={autoSubmit} />
+              <SearchForm onResults={handleResults} onLoading={setLoading} initialValues={initialValues} autoSubmit={autoSubmit} />
             <button
               onClick={() => setResults(null)}
               className="mt-4 w-full text-xs text-fmc-text-dim hover:text-fmc-text-muted font-mono underline underline-offset-2 transition-colors"
@@ -115,6 +122,9 @@ export default function Home() {
               onOpenModal={handleOpenModal}
               likedIds={likedIds}
               onToggleLike={handleToggleLike}
+              searchHistoryId={searchHistoryId}
+              aiMode={aiMode}
+              onAiAnalyze={setAiMode}
             />
           </main>
         </div>

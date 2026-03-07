@@ -155,6 +155,7 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
             onOpenModal={onOpenModal}
             isLiked={likedIds.includes(l.id)}
             onToggleLike={onToggleLike}
+            aiMode={aiMode}
           />
         ))}
       </div>
