@@ -55,6 +55,7 @@ class SearchFilters:
     radius: Optional[int] = None  # km, default 30
     condition: Optional[str] = None
     extra_patterns: list[dict] = field(default_factory=list)
+    limit: Optional[int] = None  # early-stop target (raw, before post-filter)
 
 
 def _extract_attribute(ad, key: str, default=None):
@@ -198,6 +199,11 @@ class LBCScraper:
                     logger.warning("Failed to parse ad %s: %s", getattr(ad, "id", "?"), exc)
 
             time.sleep(random.uniform(RATE_LIMIT_MIN, RATE_LIMIT_MAX))
+
+            # Early-stop: if we already have enough raw listings, no need to fetch more pages
+            if filters.limit is not None and len(results) >= filters.limit:
+                logger.info("Early-stop: collected %d listings (limit=%d)", len(results), filters.limit)
+                break
         
         # Apply post-filter to ensure filters are correctly applied
         results = self._post_filter(results, filters, city_coords)

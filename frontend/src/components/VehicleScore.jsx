@@ -51,7 +51,7 @@ export default function VehicleScore({ vehicle }) {
         </div>
         <span className="text-fmc-text-dim text-xs leading-tight">
           {hasScore
-            ? `${(reliability_score / 10).toFixed(1)}/10 fiabilité${total_testimonials ? ` · ${total_testimonials.toLocaleString('fr-FR')} tém.` : ''}`
+            ? `/10 fiabilité${total_testimonials ? ` · ${total_testimonials.toLocaleString('fr-FR')} tém.` : ''}`
             : 'N/A'
           }
         </span>

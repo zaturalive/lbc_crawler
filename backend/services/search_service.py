@@ -38,6 +38,7 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
         "condition": req.condition,
         "pattern_ids": req.pattern_ids,
         "custom_regex": req.custom_regex,
+        "limit": req.limit,  # propagate for early-stop in scraper
     }
 
     raw_listings = await _call_scraper(scraper_payload)

@@ -37,6 +37,7 @@ class ScrapeRequest(BaseModel):
     condition: Optional[str] = None
     patterns: list[dict] = []
     custom_regex: Optional[str] = None
+    limit: Optional[int] = None  # early-stop: scraper stops once this many raw listings are collected
 
 
 @app.get("/health")
@@ -70,6 +71,7 @@ def scrape(req: ScrapeRequest):
         radius=req.radius,
         condition=req.condition,
         extra_patterns=extra,
+        limit=req.limit,
     )
     try:
         listings = _lbc.search(filters)
