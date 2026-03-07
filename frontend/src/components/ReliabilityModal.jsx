@@ -75,12 +75,17 @@ export default function ReliabilityModal({ listing, onClose }) {
   const [aiError, setAiError] = useState(null);
 
   async function handleAnalyze() {
-    if (aiAnalysis) return;
+    if (aiAnalysis?.reponse) return;
     setAiLoading(true);
     setAiError(null);
     try {
       const data = await analyzeListingAI(listing.id);
-      setAiAnalysis(data);
+      if (data && data.status === 'error') {
+        setAiError("L'analyse a échoué. Réessayez.");
+        setAiAnalysis(null);
+      } else {
+        setAiAnalysis(data);
+      }
     } catch (err) {
       setAiError(err.message || 'Analyse IA indisponible');
     } finally {
@@ -410,7 +415,7 @@ export default function ReliabilityModal({ listing, onClose }) {
               </div>
 
               {/* Etat: pas encore charge */}
-              {!aiLoading && !aiAnalysis && !aiError && (
+              {!aiLoading && !aiAnalysis?.reponse && !aiError && (
                 <div className="text-center py-6">
                   <p className="text-fmc-text-dim text-xs font-mono mb-3">
                     L'IA va analyser la description de cette annonce pour trouver les réparations effectuées,
@@ -442,37 +447,37 @@ export default function ReliabilityModal({ listing, onClose }) {
               )}
 
               {/* Resultats */}
-              {aiAnalysis && (
+              {aiAnalysis?.reponse && (
                 <div className="space-y-4">
                   {/* Niveau de risque */}
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono text-fmc-text-dim">Risque global :</span>
                     <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
-                      aiAnalysis.risk_level === 'low'  ? 'bg-green-900/30 text-green-400 border border-green-500/50' :
-                      aiAnalysis.risk_level === 'high' ? 'bg-red-900/30 text-red-400 border border-red-500/50' :
+                      aiAnalysis.reponse?.risk_level === 'low'  ? 'bg-green-900/30 text-green-400 border border-green-500/50' :
+                      aiAnalysis.reponse?.risk_level === 'high' ? 'bg-red-900/30 text-red-400 border border-red-500/50' :
                                                          'bg-yellow-900/30 text-yellow-400 border border-yellow-500/50'
                     }`}>
-                      {aiAnalysis.risk_level === 'low' ? '✓ Faible' : aiAnalysis.risk_level === 'high' ? '⚠ Élevé' : '~ Modéré'}
+                      {aiAnalysis.reponse?.risk_level === 'low' ? '✓ Faible' : aiAnalysis.reponse?.risk_level === 'high' ? '⚠ Élevé' : '~ Modéré'}
                     </span>
-                    {aiAnalysis.model_used && (
-                      <span className="text-xs text-fmc-text-dim font-mono ml-auto opacity-60">via {aiAnalysis.model_used}</span>
+                    {aiAnalysis.model && (
+                      <span className="text-xs text-fmc-text-dim font-mono ml-auto opacity-60">via {aiAnalysis.model}</span>
                     )}
                   </div>
 
                   {/* Resume */}
-                  {aiAnalysis.condition_summary && (
+                  {aiAnalysis.reponse?.condition_summary && (
                     <div className="fmc-card p-3 space-y-1">
                       <p className="text-xs font-mono font-semibold text-fmc-accent">📋 État général</p>
-                      <p className="text-xs text-fmc-text leading-relaxed">{aiAnalysis.condition_summary}</p>
+                      <p className="text-xs text-fmc-text leading-relaxed">{aiAnalysis.reponse?.condition_summary}</p>
                     </div>
                   )}
 
                   {/* Reparations effectuees */}
-                  {aiAnalysis.repairs_found && aiAnalysis.repairs_found.length > 0 && (
+                  {aiAnalysis.reponse?.repairs_found && aiAnalysis.reponse?.repairs_found.length > 0 && (
                     <div className="space-y-1.5">
                       <p className="text-xs font-mono font-semibold text-fmc-accent">🔧 Réparations effectuées</p>
                       <ul className="space-y-1">
-                        {aiAnalysis.repairs_found.map((r, i) => (
+                        {aiAnalysis.reponse?.repairs_found.map((r, i) => (
                           <li key={i} className="flex items-start gap-2 text-xs text-fmc-text font-mono">
                             <span className="text-green-400 mt-0.5">✓</span>
                             <span>{r}</span>
@@ -483,11 +488,11 @@ export default function ReliabilityModal({ listing, onClose }) {
                   )}
 
                   {/* Revisions a venir */}
-                  {aiAnalysis.upcoming_maintenance && aiAnalysis.upcoming_maintenance.length > 0 && (
+                  {aiAnalysis.reponse?.upcoming_maintenance && aiAnalysis.reponse?.upcoming_maintenance.length > 0 && (
                     <div className="space-y-1.5">
                       <p className="text-xs font-mono font-semibold text-fmc-accent">🔮 Révisions probables à prévoir</p>
                       <ul className="space-y-1">
-                        {aiAnalysis.upcoming_maintenance.map((m, i) => (
+                        {aiAnalysis.reponse?.upcoming_maintenance.map((m, i) => (
                           <li key={i} className="flex items-start gap-2 text-xs text-fmc-text font-mono">
                             <span className="text-yellow-400 mt-0.5">→</span>
                             <span>{m}</span>
@@ -498,7 +503,7 @@ export default function ReliabilityModal({ listing, onClose }) {
                   )}
 
                   {/* Aucune reparation trouvee */}
-                  {aiAnalysis.repairs_found && aiAnalysis.repairs_found.length === 0 && (
+                  {aiAnalysis.reponse?.repairs_found && aiAnalysis.reponse?.repairs_found.length === 0 && (
                     <p className="text-xs text-fmc-text-dim font-mono italic">Aucune réparation mentionnée dans l'annonce.</p>
                   )}
                 </div>

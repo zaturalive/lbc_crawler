@@ -107,17 +107,30 @@ class Like(Base):
     )
 
 
-class ListingAnalysis(Base):
-    __tablename__ = "listing_analyses"
+class RequeteIA(Base):
+    __tablename__ = "requete_ia"
+
+    id          = Column(Integer, primary_key=True)
+    listing_id  = Column(Integer, ForeignKey("listings.id"), nullable=False)
+    prompt_text = Column(Text, nullable=False)        # prompt complet envoyé au LLM
+    model       = Column(String(100), nullable=False)  # ex: "gpt-4o-mini"
+    status      = Column(String(20), default="pending")  # pending | done | error
+    created_at  = Column(DateTime, default=func.now())
+
+    listing  = relationship("Listing", backref="requetes_ia", lazy="selectin")
+    reponse  = relationship("ReponseIA", back_populates="requete", uselist=False, lazy="selectin")
+
+
+class ReponseIA(Base):
+    __tablename__ = "reponse_ia"
 
     id                   = Column(Integer, primary_key=True)
-    listing_id           = Column(Integer, ForeignKey("listings.id"), nullable=False, unique=True)
-    model_used           = Column(String(100))
-    repairs_found        = Column(JSON)
-    upcoming_maintenance = Column(JSON)
+    requete_id           = Column(Integer, ForeignKey("requete_ia.id"), nullable=False, unique=True)
+    repairs_found        = Column(JSON)           # list[str]
+    upcoming_maintenance = Column(JSON)           # list[str]
     condition_summary    = Column(Text)
-    risk_level           = Column(String(20))
-    raw_response         = Column(Text)
+    risk_level           = Column(String(20))     # "low" | "medium" | "high"
+    raw_response         = Column(Text)           # réponse brute LLM
     created_at           = Column(DateTime, default=func.now())
 
-    listing = relationship("Listing", backref="analysis", lazy="selectin")
+    requete = relationship("RequeteIA", back_populates="reponse")

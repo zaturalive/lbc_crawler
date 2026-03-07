@@ -128,15 +128,26 @@ class SearchSessionResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ListingAnalysisResponse(BaseModel):
+class ReponseIAOut(BaseModel):
     id: int
-    listing_id: int
-    model_used: Optional[str] = None
+    requete_id: int
     repairs_found: Optional[list[str]] = None
     upcoming_maintenance: Optional[list[str]] = None
     condition_summary: Optional[str] = None
     risk_level: Optional[str] = None
     created_at: Optional[datetime] = None
-    is_premium: bool = False   # toujours False pour l'instant
+    is_premium: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class RequeteIAOut(BaseModel):
+    id: int
+    listing_id: int
+    model: str
+    status: str
+    created_at: Optional[datetime] = None
+    reponse: Optional[ReponseIAOut] = None
+    is_premium: bool = False
 
     model_config = {"from_attributes": True}
