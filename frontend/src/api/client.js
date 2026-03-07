@@ -37,9 +37,11 @@ export const loginApi    = (email, password) => request('POST', '/auth/login', {
 export const getMe       = (token) => request('GET', '/auth/me', undefined, token);
 export const getSavedSearches = (token) => request('GET', '/users/me/searches', undefined, token);
 
-export const analyzeListingAI = (listingId) => request('POST', `/listings/${listingId}/analyze`);
-
-export const getAiQuota = () => request('GET', '/ai/quota');
+export const analyzeListingAI = (listingId, token) => request('POST', `/listings/${listingId}/analyze`, undefined, token);
+export const getCachedAnalyses = (listingIds, token) =>
+  request('GET', `/ai/analyses?listing_ids=${listingIds.join(',')}`, undefined, token);
+export const getAiQuota = (token) => request('GET', '/ai/quota', undefined, token);
+export const getAdminAiAnalyses = (token) => request('GET', '/admin/ai-analyses', undefined, token);
 
 export const analyzeSearch = (searchHistoryId) => request('POST', `/search/${searchHistoryId}/analyze`);
 

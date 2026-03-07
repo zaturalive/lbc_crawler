@@ -5,22 +5,22 @@ from sqlalchemy.orm import selectinload
 
 from core.deps import get_current_user
 from db.database import get_db
-from models import Like, Listing, SearchSession, User, Vehicle
-from schemas import ListingResponse, SearchSessionResponse, VehicleResponse
+from models import Like, Listing, SearchHistory, User, Vehicle
+from schemas import ListingResponse, SearchHistoryOut, VehicleResponse
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/me/searches", response_model=list[SearchSessionResponse])
+@router.get("/me/searches", response_model=list[SearchHistoryOut])
 async def my_searches(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(SearchSession)
-        .where(SearchSession.user_id == current_user.id)
-        .order_by(SearchSession.created_at.desc())
-        .limit(20)
+        select(SearchHistory)
+        .where(SearchHistory.user_id == current_user.id)
+        .order_by(SearchHistory.created_at.desc())
+        .limit(50)
     )
     return list(result.scalars().all())
 

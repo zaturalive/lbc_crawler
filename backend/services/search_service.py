@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.mysql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Listing, RegexPattern, SearchHistory, SearchSession, Vehicle
+from models import Listing, RegexPattern, SearchHistory, Vehicle
 from schemas import ListingResponse, SearchRequest, SearchResult, VehicleResponse
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,12 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
     raw_listings = await _call_scraper(scraper_payload)
 
     upserted = []
+    seen_lbc_ids: set = set()
     for raw in raw_listings:
+        lbc_id = raw.get("lbc_id")
+        if lbc_id in seen_lbc_ids:
+            continue  # Doublon transmis par le scraper — on skip
+        seen_lbc_ids.add(lbc_id)
         vehicle = await _resolve_vehicle(raw.get("brand", ""), raw.get("model", ""), db)
         listing = await _upsert_listing(raw, vehicle.id if vehicle else None, db)
         listing_resp = ListingResponse.model_validate(listing)
@@ -70,24 +75,14 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
     # Appliquer la limite demandée par le client
     upserted = upserted[:req.limit]
 
-    session = SearchSession(
-        filters={k: v for k, v in req.model_dump().items() if k != "pattern_ids"},
-        patterns=[p.name for p in patterns],
-        result_count=len(upserted),
-    )
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
-
     # Save search history (best-effort, don't fail the request)
     history_id = None
     try:
         history_entry = SearchHistory(
             user_id=1,
-            params={
-                **{k: v for k, v in req.__dict__.items() if v is not None and k != "limit"},
-                "listing_ids": [l.id for l in upserted],
-            },
+            params={k: v for k, v in req.__dict__.items() if v is not None and k not in ("limit", "sort_by")},
+            listing_ids=[l.id for l in upserted],
+            patterns=[p.name for p in patterns],
             result_count=len(upserted),
         )
         db.add(history_entry)
@@ -97,7 +92,7 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
     except Exception:
         pass  # Ne pas faire échouer la recherche pour ca
 
-    return SearchResult(session_id=session.id, history_id=history_id, count=len(upserted), limit=req.limit, listings=upserted)
+    return SearchResult(session_id=history_id, history_id=history_id, count=len(upserted), limit=req.limit, listings=upserted)
 
 
 async def _call_scraper(payload: dict) -> list[dict]:

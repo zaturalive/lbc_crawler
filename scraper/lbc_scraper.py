@@ -207,7 +207,18 @@ class LBCScraper:
         
         # Apply post-filter to ensure filters are correctly applied
         results = self._post_filter(results, filters, city_coords)
-        return results
+
+        # Deduplicate by lbc_id (LBC may return same listing on multiple pages)
+        seen_ids: set = set()
+        deduped = []
+        for r in results:
+            lid = r.get("lbc_id")
+            if lid and lid not in seen_ids:
+                seen_ids.add(lid)
+                deduped.append(r)
+        if len(deduped) < len(results):
+            logger.info("Deduplicated %d → %d listings (removed %d duplicates)", len(results), len(deduped), len(results) - len(deduped))
+        return deduped
 
     def _post_filter(
         self,

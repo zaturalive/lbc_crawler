@@ -10,30 +10,108 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_MODEL = os.getenv("GITHUB_MODEL", "gpt-4o-mini")
 GITHUB_MODELS_URL = "https://models.inference.ai.azure.com/chat/completions"
 
-_BASE_SYSTEM_PROMPT = """Tu es un expert automobile. Analyse la description d'une annonce de voiture d'occasion.
+_BASE_SYSTEM_PROMPT = """Tu es un expert automobile spécialisé dans l'évaluation des voitures d'occasion en France. \
+Tu analyses des annonces LeBonCoin pour aider les acheteurs à prendre une décision éclairée.
 
 Extrais et retourne un JSON structuré avec ces 4 champs EXACTEMENT:
-- repairs_found: liste des réparations/interventions déjà effectuées mentionnées dans l'annonce (liste de strings, vide si aucune)
-- upcoming_maintenance: liste des révisions/réparations probablement à prévoir selon le kilométrage, l'âge et l'état décrit (liste de strings)
-- condition_summary: résumé de l'état général du véhicule en 2-3 phrases claires en français
-- risk_level: niveau de risque global: "low" (bon état, entretenu) | "medium" (état correct, quelques points d'attention) | "high" (risques importants, réparations majeures à prévoir)
+- repairs_found: liste des réparations/interventions DÉJÀ effectuées mentionnées dans l'annonce (liste de strings). \
+  Si le vendeur mentionne un carnet d'entretien → ajoute "Carnet d'entretien mentionné — à vérifier physiquement"
+- upcoming_maintenance: liste des points de vigilance et révisions probables à prévoir. \
+  Sois PRÉCIS et CONCRET : nomme les pièces, les kilométrages types, les coûts approximatifs si connus. \
+  Minimum 3 points, même si la voiture semble en bon état.
+- condition_summary: résumé détaillé de l'état général en 4-5 phrases. \
+  Inclure: état général, cohérence prix/km/année, points forts, points faibles, verdict final.
+- risk_level: "low" | "medium" | "high"
 
-Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication, sans texte autour."""
+Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication."""
 
 _RELIABILITY_CONTEXT_TEMPLATE = """
-CONTEXTE FIABILITÉ DU MODÈLE:
-Problèmes connus sur ce modèle : {known_issues}
-Défauts récurrents signalés : {common_issues}
 
-Lors de ton analyse:
-- Si le vendeur mentionne avoir réglé un problème connu → signale-le positivement dans repairs_found
-- Si un problème connu n'est PAS mentionné dans l'annonce → signale le risque potentiel dans upcoming_maintenance
-- Si le vendeur mentionne un "carnet d'entretien" → ne présume pas de l'état, dis plutôt "Demandez à consulter le carnet d'entretien pour vérifier X"
-- Pour les révisions : détecte si une révision est mentionnée avec une date/km → évalue si elle est récente (< 20 000 km ou < 2 ans) ou à refaire"""
+FICHE FIABILITÉ DU MODÈLE (source: fiches-auto.fr — données réelles de propriétaires):
+Véhicule: {vehicle_label}
+Score fiabilité: {reliability_score}/100 ({reliability_interpretation}) basé sur {total_testimonials} témoignages
+Catégorie: {category}
+
+TOP DÉFAUTS SIGNALÉS (classés par fréquence):
+{top_defauts}
+
+DÉTAILS DES PRINCIPAUX PROBLÈMES:
+{known_issues_detail}
+
+RÈGLES OBLIGATOIRES — tu DOIS respecter ces règles dans ta réponse:
+1. Pour chacun des TOP DÉFAUTS ci-dessus:
+   - Si l'annonce mentionne explicitement que ce problème a été réglé → ajoute dans repairs_found: "✓ [NOM DU DÉFAUT] : mentionné comme traité par le vendeur"
+   - Si ce défaut N'EST PAS mentionné dans l'annonce → ajoute dans upcoming_maintenance: "⚠️ [NOM DU DÉFAUT] (N signalements) : défaut fréquent sur ce modèle, non mentionné par le vendeur — à vérifier"
+2. Si le score fiabilité est inférieur à 50 → risk_level doit être au minimum "medium"
+3. Si 3 défauts coûteux (FAP, injection, boîte de vitesse, moteur, turbo, courroie de distribution) ne sont pas mentionnés → risk_level = "high"
+4. Dans condition_summary, cite EXPLICITEMENT le score fiabilité et les 2-3 défauts les plus fréquents pour ce modèle."""
 
 
-def build_system_prompt(known_issues=None, common_issues=None) -> str:
-    """Build the system prompt, optionally enriched with vehicle reliability context."""
+def _parse_common_issues(common_issues) -> list[tuple[str, int]]:
+    """Parse common_issues JSON into sorted list of (name, count) tuples, top 10."""
+    import re
+    if not common_issues:
+        return []
+    if isinstance(common_issues, str):
+        import json as _json
+        try:
+            common_issues = _json.loads(common_issues)
+        except Exception:
+            return []
+    if not isinstance(common_issues, list):
+        return []
+
+    result = []
+    seen = set()
+    for item in common_issues:
+        if not isinstance(item, str):
+            continue
+        # "Embray.: 68 témoignages" → ("Embray.", 68)
+        m = re.match(r'^(.+?):\s*(\d+)\s*t[ée]moignage', item)
+        if m:
+            name = m.group(1).strip()
+            count = int(m.group(2))
+            # Déduplique (Boîte de Vit. / Boîte de vit.)
+            key = name.lower().replace('.', '').replace(' ', '')
+            if key not in seen:
+                seen.add(key)
+                result.append((name, count))
+
+    result.sort(key=lambda x: x[1], reverse=True)
+    return result[:10]
+
+
+def _parse_known_issues_text(known_issues_text) -> list[str]:
+    """Extract issue names + first meaningful sentence from known_issues_text JSON."""
+    if not known_issues_text:
+        return []
+    if isinstance(known_issues_text, str):
+        import json as _json
+        try:
+            items = _json.loads(known_issues_text)
+        except Exception:
+            return []
+    else:
+        items = known_issues_text
+
+    if not isinstance(items, list):
+        return []
+
+    result = []
+    for item in items[:5]:  # max 5 problèmes détaillés
+        if not isinstance(item, str):
+            continue
+        # Extrait "NomDuProblème : première phrase."
+        first_line = item.split('\r\n')[0].split('\n')[0].strip()
+        if len(first_line) > 200:
+            first_line = first_line[:200] + "..."
+        if first_line:
+            result.append(first_line)
+    return result
+
+
+def build_system_prompt(known_issues=None, common_issues=None, vehicle_meta=None) -> str:
+    """Build the system prompt, enriched with vehicle reliability context when available."""
     prompt = _BASE_SYSTEM_PROMPT
     has_known = known_issues and (
         (isinstance(known_issues, list) and len(known_issues) > 0)
@@ -43,17 +121,60 @@ def build_system_prompt(known_issues=None, common_issues=None) -> str:
         (isinstance(common_issues, list) and len(common_issues) > 0)
         or (isinstance(common_issues, str) and common_issues.strip())
     )
-    if has_known or has_common:
-        known_str = (
-            ", ".join(known_issues) if isinstance(known_issues, list) else (known_issues or "Non renseigné")
-        )
-        common_str = (
-            ", ".join(common_issues) if isinstance(common_issues, list) else (common_issues or "Non renseigné")
-        )
-        prompt += _RELIABILITY_CONTEXT_TEMPLATE.format(
-            known_issues=known_str,
-            common_issues=common_str,
-        )
+    if not (has_known or has_common):
+        return prompt
+
+    meta = vehicle_meta or {}
+    brand = meta.get("brand") or ""
+    model = meta.get("model") or ""
+    year_start = meta.get("year_start") or ""
+    year_end = meta.get("year_end") or ""
+    score = meta.get("reliability_score")
+    testimonials = meta.get("total_testimonials") or 0
+    category = meta.get("category") or "Non renseigné"
+
+    year_range = f"{year_start}–{year_end}" if year_start and year_end else (str(year_start) or "")
+    vehicle_label = f"{brand} {model} ({year_range})".strip() if brand else "Modèle non identifié"
+
+    if score is not None:
+        if score >= 80:
+            reliability_interpretation = "excellente fiabilité"
+        elif score >= 60:
+            reliability_interpretation = "bonne fiabilité"
+        elif score >= 40:
+            reliability_interpretation = "fiabilité moyenne"
+        else:
+            reliability_interpretation = "fiabilité médiocre — prudence"
+    else:
+        reliability_interpretation = "Non disponible"
+    score_str = str(score) if score is not None else "?"
+
+    # Top défauts formatés
+    parsed_common = _parse_common_issues(common_issues)
+    if parsed_common:
+        top_defauts_lines = []
+        for name, count in parsed_common:
+            top_defauts_lines.append(f"  - {name}: {count} signalements")
+        top_defauts = "\n".join(top_defauts_lines)
+    else:
+        top_defauts = "  Aucune donnée disponible"
+
+    # Détail des problèmes principaux
+    known_details = _parse_known_issues_text(known_issues)
+    if known_details:
+        known_issues_detail = "\n".join(f"  • {d}" for d in known_details)
+    else:
+        known_issues_detail = "  Aucun détail disponible"
+
+    prompt += _RELIABILITY_CONTEXT_TEMPLATE.format(
+        vehicle_label=vehicle_label,
+        reliability_score=score_str,
+        reliability_interpretation=reliability_interpretation,
+        total_testimonials=testimonials,
+        category=category,
+        top_defauts=top_defauts,
+        known_issues_detail=known_issues_detail,
+    )
     return prompt
 
 
@@ -80,11 +201,12 @@ def build_prompt(
     price=None,
     known_issues=None,
     common_issues=None,
+    vehicle_meta=None,
 ) -> tuple[str, str]:
     """Return (user_prompt, system_prompt) for the listing analysis.
 
     The system prompt is enriched with vehicle reliability context when
-    known_issues or common_issues are provided.
+    known_issues, common_issues or vehicle_meta are provided.
     """
     user_prompt = USER_PROMPT_TEMPLATE.format(
         title=title or "Non renseigné",
@@ -93,7 +215,11 @@ def build_prompt(
         price=price or "?",
         description=description or "Pas de description disponible.",
     )
-    system_prompt = build_system_prompt(known_issues=known_issues, common_issues=common_issues)
+    system_prompt = build_system_prompt(
+        known_issues=known_issues,
+        common_issues=common_issues,
+        vehicle_meta=vehicle_meta,
+    )
     return user_prompt, system_prompt
 
 
@@ -123,7 +249,7 @@ async def call_github_models(prompt_text: str, system_prompt: Optional[str] = No
                     {"role": "user", "content": prompt_text},
                 ],
                 "temperature": 0.3,
-                "max_tokens": 1000,
+                "max_tokens": 1500,
             },
         )
         resp.raise_for_status()

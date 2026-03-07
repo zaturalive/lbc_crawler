@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from core.security import decode_token
 from db.database import get_db
-from models import Listing, RequeteIA, ReponseIA, AnalyseRecherche, ReponseRechercheIA, SearchHistory, Vehicle
+from models import Listing, ListingAnalysisUser, RequeteIA, ReponseIA, AnalyseRecherche, ReponseRechercheIA, SearchHistory, Vehicle
 from schemas import RequeteIAOut, AnalyseRechercheOut
 from services.ai_service import (
     build_prompt, call_github_models, GITHUB_MODEL,
@@ -35,6 +36,54 @@ def _extract_user_id(credentials) -> int:
         return 1
 
 
+# --- Bulk cache fetch — retourne uniquement les analyses déjà payées par cet user -----
+
+@router.get("/ai/analyses")
+async def get_cached_analyses(
+    listing_ids: str = Query(..., description="Comma-separated listing IDs, e.g. 1,2,3"),
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return analyses already paid for by this user (in listing_analysis_users)."""
+    try:
+        ids = [int(i.strip()) for i in listing_ids.split(",") if i.strip().isdigit()]
+    except ValueError:
+        raise HTTPException(status_code=422, detail="listing_ids must be comma-separated integers")
+
+    if not ids:
+        return {}
+
+    current_user_id = _extract_user_id(credentials)
+
+    # Trouver quels listing_ids cet user a déjà "payés"
+    owned_result = await db.execute(
+        select(ListingAnalysisUser.listing_id)
+        .where(ListingAnalysisUser.user_id == current_user_id)
+        .where(ListingAnalysisUser.listing_id.in_(ids))
+    )
+    owned_ids = {row[0] for row in owned_result.fetchall()}
+
+    if not owned_ids:
+        return {}
+
+    # Récupérer les analyses correspondantes
+    result = await db.execute(
+        select(RequeteIA)
+        .options(selectinload(RequeteIA.reponse))
+        .where(RequeteIA.listing_id.in_(owned_ids))
+        .where(RequeteIA.status == "done")
+    )
+    rows = result.scalars().all()
+
+    out = {}
+    for row in rows:
+        if row.listing_id not in out:
+            o = RequeteIAOut.model_validate(row)
+            o.cached = True
+            out[row.listing_id] = o.model_dump()
+    return out
+
+
 # --- Endpoint quota utilisateur -----------------------------------------------
 
 @router.get("/ai/quota")
@@ -44,10 +93,10 @@ async def get_quota(
 ):
     current_user_id = _extract_user_id(credentials)
 
+    # Quota listing = nombre d'entrées dans listing_analysis_users pour cet user
     listing_count_result = await db.execute(
-        select(func.count()).select_from(RequeteIA)
-        .where(RequeteIA.user_id == current_user_id)
-        .where(RequeteIA.status == "done")
+        select(func.count()).select_from(ListingAnalysisUser)
+        .where(ListingAnalysisUser.user_id == current_user_id)
     )
     listing_used = listing_count_result.scalar() or 0
 
@@ -63,9 +112,6 @@ async def get_quota(
         "search_analyses_used": search_used,
         "search_analyses_max": QUOTA_SEARCH_MAX,
     }
-
-
-# --- Analyse d'une recherche complete -------------------------------------------
 
 @router.post("/search/{search_id}/analyze", response_model=AnalyseRechercheOut)
 async def analyze_search(
@@ -104,7 +150,7 @@ async def analyze_search(
         raise HTTPException(status_code=404, detail="Search history not found")
 
     # Fetch listings from this search (stored as listing_ids in params), limited to 50
-    listing_ids = (search.params or {}).get("listing_ids", [])
+    listing_ids = search.listing_ids or []
     if not listing_ids:
         raise HTTPException(status_code=422, detail="Aucune annonce associee a cette recherche.")
     listing_ids = listing_ids[:50]
@@ -207,7 +253,7 @@ async def scan_immat(listing_id: int, db: AsyncSession = Depends(get_db)):
     return {"immat": None, "image_url": None}
 
 
-# --- Analyse d'une annonce individuelle (ancien endpoint, conserve) -------------
+# --- Analyse d'une annonce individuelle -----------------------------------------
 
 @router.post("/listings/{listing_id}/analyze", response_model=RequeteIAOut)
 async def analyze_listing(
@@ -217,32 +263,63 @@ async def analyze_listing(
 ):
     current_user_id = _extract_user_id(credentials)
 
-    # Cache check — retourne directement si une analyse done existe pour ce listing
-    result = await db.execute(
-        select(RequeteIA)
-        .where(RequeteIA.listing_id == listing_id)
-        .where(RequeteIA.status == "done")
+    # ÉTAPE 1 — Cet user a-t-il déjà payé pour cette annonce ?
+    owned_result = await db.execute(
+        select(ListingAnalysisUser)
+        .where(ListingAnalysisUser.user_id == current_user_id)
+        .where(ListingAnalysisUser.listing_id == listing_id)
     )
-    cached = result.scalar_one_or_none()
-    if cached and cached.reponse:
-        out = RequeteIAOut.model_validate(cached)
-        out.is_premium = False
-        out.cached = True
-        return out
+    already_owned = owned_result.scalar_one_or_none()
+    if already_owned:
+        # Gratuit — retourne le cache sans consommer de crédit
+        cached_result = await db.execute(
+            select(RequeteIA)
+            .options(selectinload(RequeteIA.reponse))
+            .where(RequeteIA.listing_id == listing_id)
+            .where(RequeteIA.status == "done")
+        )
+        cached = cached_result.scalar_one_or_none()
+        if cached and cached.reponse:
+            out = RequeteIAOut.model_validate(cached)
+            out.is_premium = False
+            out.cached = True
+            return out
 
-    # Quota check
+    # ÉTAPE 2 — Vérifier le quota de cet user
     quota_result = await db.execute(
-        select(func.count()).select_from(RequeteIA)
-        .where(RequeteIA.user_id == current_user_id)
-        .where(RequeteIA.status == "done")
+        select(func.count()).select_from(ListingAnalysisUser)
+        .where(ListingAnalysisUser.user_id == current_user_id)
     )
     quota_used = quota_result.scalar() or 0
     if quota_used >= QUOTA_LISTING_MAX:
         raise HTTPException(
             status_code=429,
-            detail="Quota atteint : 10 analyses de fiches maximum. Votre quota sera réinitialisé prochainement.",
+            detail=f"Quota atteint : {QUOTA_LISTING_MAX} analyses maximum. Votre quota sera réinitialisé prochainement.",
         )
 
+    # ÉTAPE 3 — Une analyse globale existe déjà pour ce listing (autre user) ?
+    global_cached_result = await db.execute(
+        select(RequeteIA)
+        .options(selectinload(RequeteIA.reponse))
+        .where(RequeteIA.listing_id == listing_id)
+        .where(RequeteIA.status == "done")
+    )
+    global_cached = global_cached_result.scalar_one_or_none()
+
+    if global_cached and global_cached.reponse:
+        # Cache global disponible — consomme 1 crédit, ZÉRO appel API
+        db.add(ListingAnalysisUser(
+            listing_id=listing_id,
+            user_id=current_user_id,
+            used_cache=True,
+        ))
+        await db.commit()
+        out = RequeteIAOut.model_validate(global_cached)
+        out.is_premium = False
+        out.cached = True
+        return out
+
+    # ÉTAPE 4 — Pas de cache : appel IA réel
     result = await db.execute(select(Listing).where(Listing.id == listing_id))
     listing = result.scalar_one_or_none()
     if not listing:
@@ -251,7 +328,7 @@ async def analyze_listing(
     if not listing.description:
         raise HTTPException(status_code=422, detail="Cette annonce n'a pas de description a analyser.")
 
-    # Retrieve vehicle reliability context if available
+    # Contexte fiabilité du véhicule
     vehicle = None
     if listing.vehicle_id:
         v_result = await db.execute(select(Vehicle).where(Vehicle.id == listing.vehicle_id))
@@ -259,6 +336,15 @@ async def analyze_listing(
 
     known_issues = vehicle.known_issues_text if vehicle else None
     common_issues = vehicle.common_issues if vehicle else None
+    vehicle_meta = {
+        "brand": vehicle.brand if vehicle else None,
+        "model": vehicle.model if vehicle else None,
+        "year_start": vehicle.year_start if vehicle else None,
+        "year_end": vehicle.year_end if vehicle else None,
+        "reliability_score": vehicle.reliability_score if vehicle else None,
+        "total_testimonials": vehicle.total_testimonials if vehicle else None,
+        "category": vehicle.category if vehicle else None,
+    } if vehicle else None
 
     user_prompt, system_prompt = build_prompt(
         title=listing.title,
@@ -268,6 +354,7 @@ async def analyze_listing(
         price=listing.price,
         known_issues=known_issues,
         common_issues=common_issues,
+        vehicle_meta=vehicle_meta,
     )
 
     requete = RequeteIA(
@@ -302,6 +389,13 @@ async def analyze_listing(
     )
     db.add(reponse)
     requete.status = "done"
+
+    # Enregistrer que cet user a consommé un crédit pour ce listing
+    db.add(ListingAnalysisUser(
+        listing_id=listing_id,
+        user_id=current_user_id,
+        used_cache=False,
+    ))
     await db.commit()
     await db.refresh(requete)
 

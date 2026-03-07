@@ -47,11 +47,11 @@ export default function VehicleScore({ vehicle }) {
           scoreBorderClass(reliability_score),
           scoreTextClass(reliability_score),
         )}>
-          {hasScore ? (reliability_score / 10).toFixed(1) : '–'}
+        {hasScore ? reliability_score : '–'}
         </div>
         <span className="text-fmc-text-dim text-xs leading-tight">
           {hasScore
-            ? `/10 fiabilité${total_testimonials ? ` · ${total_testimonials.toLocaleString('fr-FR')} tém.` : ''}`
+            ? `/100 fiabilité${total_testimonials ? ` · ${total_testimonials.toLocaleString('fr-FR')} tém.` : ''}`
             : 'N/A'
           }
         </span>

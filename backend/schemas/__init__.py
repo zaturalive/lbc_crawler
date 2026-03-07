@@ -64,7 +64,7 @@ class SearchRequest(BaseModel):
 
 
 class SearchResult(BaseModel):
-    session_id: int
+    session_id: Optional[int] = None
     history_id: Optional[int] = None
     count: int
     limit: int
@@ -133,8 +133,10 @@ class SearchSessionResponse(BaseModel):
 class SearchHistoryOut(BaseModel):
     id: int
     user_id: int
-    params: dict
-    result_count: int
+    params: Optional[dict] = None
+    listing_ids: Optional[list[int]] = None
+    patterns: Optional[list[str]] = None
+    result_count: Optional[int] = None
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

@@ -110,14 +110,25 @@ const KEYWORD_VARIANTS = {
   'Premier propriétaire':'purple',
 };
 
-export default function ListingCard({ listing, onOpenModal, isLiked = false, onToggleLike, aiMode = false, aiAnalysis = null }) {
+export default function ListingCard({ listing, onOpenModal, isLiked = false, onToggleLike, aiMode = false, aiAnalysis = null, isAnalyzing = false, isViewed = false, hasAiAnalysis = false }) {
   const { title, price, year, mileage, location, url, matched_keywords, vehicle, gearbox, horsepower, fuel_type, doors, seats, color } = listing;
   const [galleryOpen, setGalleryOpen] = useState(false);
+
+  // Badge IA en mode IA
+  const aiBadge = (() => {
+    if (!aiMode) return null;
+    if (isAnalyzing) return { icon: '⏳', bg: 'bg-purple-900/80', text: 'text-purple-200', label: 'Analyse…' };
+    if (!aiAnalysis?.reponse) return { icon: '○', bg: 'bg-zinc-900/70', text: 'text-zinc-400', label: null };
+    const r = aiAnalysis.reponse.risk_level;
+    if (r === 'low')    return { icon: '✅', bg: 'bg-green-900/80',  text: 'text-green-200',  label: 'OK' };
+    if (r === 'high')   return { icon: '⚠️', bg: 'bg-red-900/80',    text: 'text-red-200',    label: 'Risqué' };
+    return                     { icon: '⚡', bg: 'bg-yellow-900/80', text: 'text-yellow-200', label: 'Moyen' };
+  })();
 
   return (
     <>
     <Card
-      className={`group animate-fade-in relative ${aiMode ? 'ai-mode-card' : ''}`}
+      className={`group animate-fade-in relative ${aiMode ? 'ai-mode-card' : ''} ${isAnalyzing ? 'ring-2 ring-purple-500/60 ring-offset-1 ring-offset-transparent' : ''}`}
       onClick={() => onOpenModal && onOpenModal(listing)}
     >
       <CardContent className="space-y-3">
@@ -137,6 +148,13 @@ export default function ListingCard({ listing, onOpenModal, isLiked = false, onT
                 +{listing.images.length - 1}
               </span>
             )}
+            {/* Badge IA sur le thumbnail (mode IA uniquement) */}
+            {aiBadge && (
+              <span className={`absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono ${aiBadge.bg} ${aiBadge.text} backdrop-blur-sm`}>
+                <span>{aiBadge.icon}</span>
+                {aiBadge.label && <span>{aiBadge.label}</span>}
+              </span>
+            )}
             <button
               className="absolute inset-0 w-full h-full opacity-0 hover:opacity-100 bg-black/30 flex items-center justify-center transition-opacity duration-200"
               onClick={e => { e.stopPropagation(); setGalleryOpen(true); }}
@@ -147,33 +165,54 @@ export default function ListingCard({ listing, onOpenModal, isLiked = false, onT
           </div>
         )}
 
-        {/* Bouton like — positionné en haut à droite */}
-        <button
-          type="button"
-          aria-label={isLiked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-          onClick={e => {
-            e.stopPropagation();
-            onToggleLike && onToggleLike(listing.id);
-          }}
-          className={`absolute top-3 right-3 p-1.5 rounded-md border transition-all duration-200 ${
-            isLiked
-              ? 'border-red-500/70 text-red-400 bg-red-900/20'
-              : 'border-fmc-accent-deep text-fmc-text-dim hover:border-red-500/70 hover:text-red-400 hover:bg-red-900/10'
-          }`}
-        >
-          <Heart className={`h-3.5 w-3.5 ${isLiked ? 'fill-current' : ''}`} />
-        </button>
-
-        {/* Title + Price */}
-        <div className="space-y-1 min-w-0">
-          <h3 className="text-sm font-semibold text-fmc-text group-hover:text-fmc-glow transition-colors line-clamp-2 font-mono leading-snug">
-            {title || 'Annonce sans titre'}
-          </h3>
-          {price && (
-            <p className="text-xl font-bold text-fmc-accent font-mono">
-              {new Intl.NumberFormat('fr-FR').format(price)}&nbsp;€
-            </p>
-          )}
+        {/* Title + Price + Badges + Like */}
+        <div className="flex items-start justify-between gap-2 min-w-0">
+          <div className="space-y-1 min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-fmc-text group-hover:text-fmc-glow transition-colors line-clamp-2 font-mono leading-snug">
+              {title || 'Annonce sans titre'}
+            </h3>
+            {price && (
+              <p className="text-xl font-bold text-fmc-accent font-mono">
+                {new Intl.NumberFormat('fr-FR').format(price)}&nbsp;€
+              </p>
+            )}
+            {/* Badges statut */}
+            {(isViewed || hasAiAnalysis) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {isViewed && (
+                  <span
+                    title="Annonce déjà consultée"
+                    className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800/70 text-zinc-400 border border-zinc-700/50"
+                  >
+                    👁 Vue
+                  </span>
+                )}
+                {hasAiAnalysis && (
+                  <span
+                    title="Analyse IA disponible"
+                    className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-900/50 text-purple-300 border border-purple-700/50"
+                  >
+                    ✨ IA
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            aria-label={isLiked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+            onClick={e => {
+              e.stopPropagation();
+              onToggleLike && onToggleLike(listing.id);
+            }}
+            className={`flex-shrink-0 p-1.5 rounded-md border transition-all duration-200 ${
+              isLiked
+                ? 'border-red-500/70 text-red-400 bg-red-900/20'
+                : 'border-fmc-accent-deep text-fmc-text-dim hover:border-red-500/70 hover:text-red-400 hover:bg-red-900/10'
+            }`}
+          >
+            <Heart className={`h-3.5 w-3.5 ${isLiked ? 'fill-current' : ''}`} />
+          </button>
         </div>
 
         {/* Meta row */}

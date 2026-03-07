@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -25,6 +25,9 @@ class Vehicle(Base):
     reliability_rank  = Column(String(20), nullable=True)
     fuel_type         = Column(String(50))
     scraped_at        = Column(DateTime, server_default=func.now())
+    category          = Column(String(50), nullable=True)
+    rank_in_category  = Column(Integer, nullable=True)
+    total_in_category = Column(Integer, nullable=True)
 
     listings = relationship("Listing", back_populates="vehicle")
 
@@ -80,17 +83,6 @@ class User(Base):
     created_at         = Column(DateTime, server_default=func.now())
 
 
-class SearchSession(Base):
-    __tablename__ = "search_sessions"
-
-    id           = Column(Integer, primary_key=True, autoincrement=True)
-    user_id      = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    filters      = Column(JSON)
-    patterns     = Column(JSON)
-    result_count = Column(Integer, default=0)
-    created_at   = Column(DateTime, server_default=func.now())
-
-
 class Like(Base):
     __tablename__ = "likes"
 
@@ -114,6 +106,8 @@ class SearchHistory(Base):
     id           = Column(Integer, primary_key=True)
     user_id      = Column(Integer, default=1, nullable=False)
     params       = Column(JSON, nullable=False)
+    listing_ids  = Column(JSON, nullable=True)
+    patterns     = Column(JSON, nullable=True)
     result_count = Column(Integer, default=0)
     created_at   = Column(DateTime, default=func.now())
 
@@ -128,6 +122,25 @@ class ViewedListing(Base):
 
     listing = relationship("Listing", lazy="selectin")
 
+    __table_args__ = (
+        UniqueConstraint("user_id", "listing_id", name="uk_vl_user_listing"),
+    )
+
+
+class ListingAnalysisUser(Base):
+    """Join table: tracks which users have consumed a credit for which listing analysis."""
+    __tablename__ = "listing_analysis_users"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
+    user_id    = Column(Integer, ForeignKey("users.id",    ondelete="CASCADE"), nullable=False)
+    used_cache = Column(Boolean, default=False)   # True = cache hit (no real AI call was made)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("listing_id", "user_id", name="uk_lau_listing_user"),
+    )
+
 
 class RequeteIA(Base):
     __tablename__ = "requete_ia"
@@ -135,7 +148,7 @@ class RequeteIA(Base):
     id          = Column(Integer, primary_key=True)
     listing_id  = Column(Integer, ForeignKey("listings.id"), nullable=False)
     user_id     = Column(Integer, nullable=True)
-    prompt_text = Column(Text, nullable=False)        # prompt complet envoyé au LLM
+    prompt_text = Column(Text, nullable=True)        # prompt complet envoyé au LLM
     model       = Column(String(100), nullable=False)  # ex: "gpt-4o-mini"
     status      = Column(String(20), default="pending")  # pending | done | error
     created_at  = Column(DateTime, default=func.now())
@@ -166,7 +179,7 @@ class AnalyseRecherche(Base):
     search_id   = Column(Integer, ForeignKey("search_history.id", ondelete="CASCADE"), nullable=False, unique=True)
     user_id     = Column(Integer, nullable=True)
     listing_ids = Column(JSON, nullable=False)   # list[int] des listings analyses
-    prompt_text = Column(Text, nullable=False)
+    prompt_text = Column(Text, nullable=True)
     model       = Column(String(100), nullable=False)
     status      = Column(String(20), default="pending")  # pending | done | error
     created_at  = Column(DateTime, default=func.now())

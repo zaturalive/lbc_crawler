@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const ADMIN_USER_IDS = [1, 6];
+
 export default function Header() {
   const { user, logout } = useAuth();
 
@@ -23,6 +25,15 @@ export default function Header() {
           >
             Historique
           </Link>
+          {ADMIN_USER_IDS.includes(user?.id) && (
+            <Link
+              to="/admin/ai"
+              className="text-xs font-mono text-fmc-text-dim hover:text-purple-400 transition-colors"
+              title="Administration IA"
+            >
+              ✨ Admin
+            </Link>
+          )}
           {user ? (
             <>
               <span className="text-xs font-mono text-fmc-text-dim hidden sm:block max-w-[140px] truncate">

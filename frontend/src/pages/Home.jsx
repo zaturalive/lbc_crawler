@@ -7,13 +7,25 @@ import Header from '../components/Header';
 import ReliabilityModal from '../components/ReliabilityModal';
 
 export default function Home() {
-  const [results, setResults] = useState(null);
+  // Restaure les résultats depuis sessionStorage si dispo (survit à la navigation)
+  const [results, setResults] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('fmc_results');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
   const [loading, setLoading] = useState(false);
   const [selectedListing, setSelectedListing] = useState(null);
   const [likedIds, setLikedIds] = useState([]);
+  const [viewedIds, setViewedIds] = useState(new Set());
   const [aiMode, setAiMode] = useState(false);
   const [ripple, setRipple] = useState(null);
-  const [searchHistoryId, setSearchHistoryId] = useState(null);
+  const [searchHistoryId, setSearchHistoryId] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('fmc_results');
+      return saved ? JSON.parse(saved)?.history_id || null : null;
+    } catch { return null; }
+  });
   const location = useLocation();
   const initialValues = location.state?.loadSearch || null;
   const autoSubmit = !!(initialValues && location.state?.autoSubmit);
@@ -31,17 +43,34 @@ export default function Home() {
     });
   }, []);
 
+  // Charge les listings déjà consultés (si connecté)
+  useEffect(() => {
+    if (!token) return;
+    import('../api/client').then(({ getViewedListings }) => {
+      getViewedListings()
+        .then(data => {
+          if (Array.isArray(data)) {
+            setViewedIds(new Set(data.map(v => v.listing_id)));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [token]);
+
   function handleResults(data) {
     setResults(data);
     setSearchHistoryId(data?.history_id || null);
+    try { sessionStorage.setItem('fmc_results', JSON.stringify(data)); } catch {}
   }
 
   // Ouvre la modal + marque l'annonce comme vue (best-effort)
-  function handleOpenModal(listing) {
+  function handleOpenModal(listing, aiAnalysis = null) {
     import('../api/client').then(({ markListingViewed }) => {
       markListingViewed(listing.id).catch(() => {});
     });
-    setSelectedListing(listing);
+    // Mise à jour locale immédiate pour l'icône "vu"
+    setViewedIds(prev => new Set([...prev, listing.id]));
+    setSelectedListing({ listing, aiAnalysis });
   }
 
   async function handleToggleLike(listingId) {
@@ -133,7 +162,7 @@ export default function Home() {
             </h2>
               <SearchForm onResults={handleResults} onLoading={setLoading} initialValues={initialValues} autoSubmit={autoSubmit} />
             <button
-              onClick={() => setResults(null)}
+              onClick={() => { setResults(null); try { sessionStorage.removeItem('fmc_results'); } catch {} }}
               className="mt-4 w-full text-xs text-fmc-text-dim hover:text-fmc-text-muted font-mono underline underline-offset-2 transition-colors"
             >
               ← Nouvelle recherche
@@ -151,6 +180,9 @@ export default function Home() {
               searchHistoryId={searchHistoryId}
               aiMode={aiMode}
               onAiAnalyze={handleAiMode}
+              token={token}
+              viewedIds={viewedIds}
+              onClearSearch={() => { setResults(null); try { sessionStorage.removeItem('fmc_results'); } catch {} }}
             />
           </main>
         </div>
@@ -173,8 +205,10 @@ export default function Home() {
 
       {selectedListing && (
         <ReliabilityModal
-          listing={selectedListing}
+          listing={selectedListing.listing}
+          initialAnalysis={selectedListing.aiAnalysis}
           onClose={() => setSelectedListing(null)}
+          token={token}
         />
       )}
       </div>

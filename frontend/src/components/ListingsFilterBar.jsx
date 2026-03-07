@@ -2,11 +2,12 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, X, SlidersHorizontal } from 'lucide-react';
 import NumberInput from './ui/NumberInput';
 
-export default function ListingsFilterBar({ listings, onFiltered }) {
+export default function ListingsFilterBar({ listings, onFiltered, analyzedIds = new Set() }) {
   const [titleSearch, setTitleSearch]       = useState('');
   const [checkedKeywords, setCheckedKeywords] = useState([]);
   const [kmMin, setKmMin]                   = useState('');
   const [onlyWithFiche, setOnlyWithFiche]   = useState(false);
+  const [onlyWithAI, setOnlyWithAI]         = useState(false);
 
   // Stable ref to avoid stale-closure issues with the callback
   const onFilteredRef = useRef(onFiltered);
@@ -38,8 +39,11 @@ export default function ListingsFilterBar({ listings, onFiltered }) {
     if (onlyWithFiche) {
       r = r.filter(l => l.vehicle?.source_url);
     }
+    if (onlyWithAI) {
+      r = r.filter(l => analyzedIds.has(l.id));
+    }
     return r;
-  }, [listings, titleSearch, checkedKeywords, kmMin, onlyWithFiche]);
+  }, [listings, titleSearch, checkedKeywords, kmMin, onlyWithFiche, onlyWithAI, analyzedIds]);
 
   // Notify parent on every change
   useEffect(() => {
@@ -57,9 +61,10 @@ export default function ListingsFilterBar({ listings, onFiltered }) {
     setCheckedKeywords([]);
     setKmMin('');
     setOnlyWithFiche(false);
+    setOnlyWithAI(false);
   }
 
-  const hasActiveFilters = titleSearch || checkedKeywords.length > 0 || kmMin || onlyWithFiche;
+  const hasActiveFilters = titleSearch || checkedKeywords.length > 0 || kmMin || onlyWithFiche || onlyWithAI;
   const total = listings?.length ?? 0;
   const filteredCount = filtered.length;
 
@@ -120,6 +125,18 @@ export default function ListingsFilterBar({ listings, onFiltered }) {
         />
         <span className={onlyWithFiche ? 'text-fmc-accent' : 'text-fmc-text-dim'}>
           Avec fiche fiabilité
+        </span>
+      </label>
+
+      {/* Filtre analyse IA */}
+      <label className="flex items-center gap-1.5 cursor-pointer select-none flex-shrink-0">
+        <input
+          type="checkbox"
+          checked={onlyWithAI}
+          onChange={e => setOnlyWithAI(e.target.checked)}
+        />
+        <span className={onlyWithAI ? 'text-purple-300' : 'text-fmc-text-dim'}>
+          ✨ Déjà analysée IA
         </span>
       </label>
 

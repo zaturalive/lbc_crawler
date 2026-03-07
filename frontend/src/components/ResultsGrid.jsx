@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import ListingCard from './ListingCard';
 import ListingsFilterBar from './ListingsFilterBar';
-import { analyzeListingAI, getAiQuota } from '../api/client';
+import { analyzeListingAI, getCachedAnalyses, getAiQuota } from '../api/client';
 
-export default function ResultsGrid({ results, loading, onOpenModal, likedIds = [], onToggleLike, aiMode = false, onAiAnalyze, searchHistoryId = null }) {
+export default function ResultsGrid({ results, loading, onOpenModal, likedIds = [], onToggleLike, aiMode = false, onAiAnalyze, searchHistoryId = null, token = null, onClearSearch = null, viewedIds = new Set() }) {
   const [filteredListings, setFilteredListings] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
@@ -11,11 +11,12 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
   const [cols, setCols] = useState(3);
   const [batchProgress, setBatchProgress] = useState(null);
   const [cardAnalyses, setCardAnalyses] = useState({});
+  const [currentlyAnalyzing, setCurrentlyAnalyzing] = useState(null);
 
   // Charge le quota IA au montage (silencieux si indisponible)
   useEffect(() => {
-    getAiQuota().then(setAiQuota).catch(() => {});
-  }, []);
+    getAiQuota(token).then(setAiQuota).catch(() => {});
+  }, [token]);
 
   // Auto-dismiss du toast d'erreur après 5s
   useEffect(() => {
@@ -30,6 +31,21 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
     setCardAnalyses({});
   }, [results]);
 
+  // Charge automatiquement les analyses déjà payées par l'user au montage
+  useEffect(() => {
+    if (!token || !results?.listings?.length) return;
+    const ids = results.listings.map(l => l.id);
+    getCachedAnalyses(ids, token)
+      .then(cached => {
+        if (cached && typeof cached === 'object' && Object.keys(cached).length > 0) {
+          const parsed = {};
+          for (const [k, v] of Object.entries(cached)) parsed[parseInt(k)] = v;
+          setCardAnalyses(prev => ({ ...prev, ...parsed }));
+        }
+      })
+      .catch(() => {});
+  }, [results, token]);
+
   async function handleAiAnalyze(e) {
     if (aiLoading) return;
     const coords = e ? { x: e.clientX, y: e.clientY } : null;
@@ -37,26 +53,48 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
     onAiAnalyze && onAiAnalyze(true, coords);
 
     const toAnalyze = filteredListings.slice(0, 50);
-    setBatchProgress({ done: 0, total: toAnalyze.length });
 
-    let done = 0;
-    for (const listing of toAnalyze) {
+    // Pré-charger les analyses déjà en cache
+    let alreadyCached = {};
+    try {
+      const ids = toAnalyze.map(l => l.id);
+      const cached = await getCachedAnalyses(ids, token);
+      if (cached && typeof cached === 'object') {
+        for (const [k, v] of Object.entries(cached)) alreadyCached[parseInt(k)] = v;
+        setCardAnalyses(prev => ({ ...prev, ...alreadyCached }));
+      }
+    } catch (_) { /* silencieux */ }
+
+    // Séparer les cards à analyser (non cachées) des cards déjà prêtes
+    const needsAnalysis = toAnalyze.filter(l => !alreadyCached[l.id]);
+    const cachedCount   = toAnalyze.length - needsAnalysis.length;
+
+    setBatchProgress({ done: cachedCount, total: toAnalyze.length, cached: cachedCount, newCount: 0 });
+
+    let done = cachedCount;
+    let newCount = 0;
+    for (const listing of needsAnalysis) {
+      setCurrentlyAnalyzing(listing.id);
       try {
-        const result = await analyzeListingAI(listing.id);
+        const result = await analyzeListingAI(listing.id, token);
         setCardAnalyses(prev => ({ ...prev, [listing.id]: result }));
+        if (!result?.cached) newCount++;
       } catch (err) {
         if (err?.status === 429) {
-          setAiError(err?.message || 'Quota IA dépassé');
+          setAiError(err?.message || 'Quota IA dépassé (10/10)');
           break;
         }
-        // autres erreurs: skip this card silently
+        // autres erreurs: skip silencieusement
       }
       done++;
-      setBatchProgress({ done, total: toAnalyze.length });
+      setBatchProgress({ done, total: toAnalyze.length, cached: cachedCount, newCount });
     }
 
+    setCurrentlyAnalyzing(null);
     setAiLoading(false);
     setBatchProgress(null);
+    // Rafraîchir le quota après le batch
+    getAiQuota(token).then(setAiQuota).catch(() => {});
     setTimeout(() => onAiAnalyze && onAiAnalyze(false, null), 2000);
   }
 
@@ -104,6 +142,17 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
             — {listingsWithScore} avec score fiabilité
           </span>
         )}
+
+        {/* Bouton fermer recherche */}
+        {onClearSearch && (
+          <button
+            onClick={onClearSearch}
+            className="flex items-center gap-1 px-2 py-1 rounded font-mono text-xs text-fmc-text-dim border border-fmc-accent-deep/30 hover:text-red-400 hover:border-red-500/50 transition-colors"
+            title="Fermer la recherche et revenir à l'accueil"
+          >
+            ✕ Fermer
+          </button>
+        )}
         {/* Toggle colonnes */}
         <div className="flex items-center gap-1 ml-auto border border-fmc-accent-deep/40 rounded overflow-hidden">
           {[2, 3].map(n => (
@@ -123,7 +172,7 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
         </div>
 
         {(() => {
-          const quotaReached = aiQuota && aiQuota.search_analyses_used >= aiQuota.search_analyses_max;
+          const quotaReached = aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max;
           return (
             <div className="flex flex-col items-end gap-0.5">
               <button
@@ -139,13 +188,13 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
               >
                 {quotaReached ? '✨ Quota atteint' : aiLoading ? (
                   batchProgress
-                    ? `⏳ Analyse ${batchProgress.done}/${batchProgress.total}...`
+                    ? `⏳ ${batchProgress.done}/${batchProgress.total} · ${batchProgress.newCount ?? 0} nouvelles · ⚡${batchProgress.cached ?? 0} cache`
                     : '⏳ Préparation...'
-                ) : '✨ Analyse IA des cards'}
+                ) : `✨ Analyse IA des cards`}
               </button>
               {aiQuota && (
                 <span className="text-fmc-text-dim text-xs font-mono">
-                  ({aiQuota.search_analyses_used}/{aiQuota.search_analyses_max} utilisées)
+                  ({aiQuota.listing_analyses_used}/{aiQuota.listing_analyses_max} analyses utilisées)
                 </span>
               )}
             </div>
@@ -154,7 +203,11 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
       </div>
 
       {/* Barre de filtres client-side */}
-      <ListingsFilterBar listings={listings} onFiltered={setFilteredListings} />
+      <ListingsFilterBar
+        listings={listings}
+        onFiltered={setFilteredListings}
+        analyzedIds={new Set(Object.keys(cardAnalyses).map(Number))}
+      />
 
       {/* Grid */}
       <div className={`grid grid-cols-1 gap-4 p-1 ${cols === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
@@ -162,11 +215,14 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
           <ListingCard
             key={l.lbc_id || l.id}
             listing={l}
-            onOpenModal={onOpenModal}
+            onOpenModal={(listing) => onOpenModal(listing, cardAnalyses[listing.id] || null)}
             isLiked={likedIds.includes(l.id)}
             onToggleLike={onToggleLike}
             aiMode={aiMode}
             aiAnalysis={cardAnalyses[l.id] || null}
+            isAnalyzing={currentlyAnalyzing === l.id}
+            isViewed={viewedIds.has(l.id)}
+            hasAiAnalysis={!!cardAnalyses[l.id]?.reponse}
           />
         ))}
       </div>

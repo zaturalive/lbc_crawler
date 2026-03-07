@@ -1,11 +1,12 @@
 import re
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.database import get_db
-from models import Like, Listing, SearchSession
+from models import Like, Listing
 from schemas import ListingResponse
 
 router = APIRouter()
@@ -15,7 +16,7 @@ USER_ID = 1  # Hardcoded until auth is implemented
 
 @router.get("/listings", response_model=list[ListingResponse])
 async def get_listings(
-    session_id: int,
+    session_id: Optional[int] = None,
     page: int = 1,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
@@ -23,7 +24,6 @@ async def get_listings(
     offset = (page - 1) * limit
     result = await db.execute(
         select(Listing)
-        .join(SearchSession, SearchSession.id == session_id, isouter=True)
         .order_by(Listing.scraped_at.desc())
         .offset(offset)
         .limit(limit)

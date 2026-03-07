@@ -50,8 +50,8 @@ function parseDetailedIssue(raw) {
 
 const scoreVariant = (score) => {
   if (score === null || score === undefined) return 'default';
-  if (score >= 7) return 'success';
-  if (score >= 4) return 'warning';
+  if (score >= 70) return 'success';
+  if (score >= 40) return 'warning';
   return 'danger';
 };
 
@@ -68,17 +68,17 @@ const TABS = [
   { id: 'liens',      label: 'Liens' },
 ];
 
-export default function ReliabilityModal({ listing, onClose }) {
+export default function ReliabilityModal({ listing, initialAnalysis = null, onClose, token = null }) {
   const [activeTab, setActiveTab] = useState('annonce');
-  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiAnalysis, setAiAnalysis] = useState(initialAnalysis);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [aiQuota, setAiQuota] = useState(null);
 
   // Charge le quota IA au montage (silencieux si indisponible)
   useEffect(() => {
-    getAiQuota().then(setAiQuota).catch(() => {});
-  }, []);
+    getAiQuota(token).then(setAiQuota).catch(() => {});
+  }, [token]);
 
   // Auto-dismiss du toast d'erreur après 5s
   useEffect(() => {
@@ -92,16 +92,19 @@ export default function ReliabilityModal({ listing, onClose }) {
     setAiLoading(true);
     setAiError(null);
     try {
-      const data = await analyzeListingAI(listing.id);
+      const data = await analyzeListingAI(listing.id, token);
       if (data && data.status === 'error') {
         setAiError("L'analyse a échoué. Réessayez.");
         setAiAnalysis(null);
       } else {
         setAiAnalysis(data);
+        // Refresh quota après analyse
+        getAiQuota(token).then(setAiQuota).catch(() => {});
       }
     } catch (err) {
       if (err?.status === 429) {
-        setAiError(err.message || 'Quota IA dépassé');
+        setAiError(`Quota IA dépassé (${aiQuota?.listing_analyses_max || 10}/${aiQuota?.listing_analyses_max || 10})`);
+        getAiQuota(token).then(setAiQuota).catch(() => {});
       } else {
         setAiError(err.message || 'Analyse IA indisponible');
       }
@@ -170,10 +173,10 @@ export default function ReliabilityModal({ listing, onClose }) {
             </button>
           ))}
           <button
-            onClick={() => { setActiveTab('analyse-ia'); handleAnalyze(); }}
-            disabled={aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max}
+            onClick={() => { setActiveTab('analyse-ia'); if (!aiAnalysis?.reponse) handleAnalyze(); }}
+            disabled={!aiAnalysis?.reponse && aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max}
             className={`px-4 py-2.5 text-xs font-mono font-semibold transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
-              aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max
+              !aiAnalysis?.reponse && aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max
                 ? 'text-zinc-500 border-transparent cursor-not-allowed'
                 : activeTab === 'analyse-ia'
                   ? 'text-fmc-accent border-fmc-accent'
@@ -181,7 +184,11 @@ export default function ReliabilityModal({ listing, onClose }) {
             }`}
           >
             ✨ Analyse IA
-            {aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max ? (
+            {aiAnalysis?.reponse ? (
+              <span className="px-1.5 py-0.5 text-xs font-mono rounded-full bg-purple-900/40 border border-purple-500/50 text-purple-300 leading-none">
+                ✓ Cache
+              </span>
+            ) : aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max ? (
               <span className="px-1.5 py-0.5 text-xs font-mono rounded-full bg-red-900/30 border border-red-500/50 text-red-400 leading-none">
                 {aiQuota.listing_analyses_max}/{aiQuota.listing_analyses_max}
               </span>
@@ -307,7 +314,7 @@ export default function ReliabilityModal({ listing, onClose }) {
                     <div className="flex items-center gap-3">
                       <Badge variant={scoreVariant(vehicle.reliability_score)} className="text-base px-4 py-1.5 font-mono">
                         {vehicle.reliability_score !== null && vehicle.reliability_score !== undefined
-                          ? `${vehicle.reliability_score}/10`
+                          ? `${vehicle.reliability_score}/100`
                           : 'N/A'
                         }
                       </Badge>

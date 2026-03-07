@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import VerifyEmail from './pages/VerifyEmail';
 import Account from './pages/Account';
 import History from './pages/History';
+import AdminAI from './pages/AdminAI';
 import './App.css';
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/account" element={<Account />} />
           <Route path="/history" element={<History />} />
+          <Route path="/admin/ai" element={<AdminAI />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
