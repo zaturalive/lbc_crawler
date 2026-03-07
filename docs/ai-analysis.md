@@ -41,31 +41,19 @@ Les analyses sont **mises en cache** dans la table `listing_analyses`. Un second
 
 | Variable | Défaut | Description |
 |----------|--------|-------------|
-| `AI_PROVIDER` | `openai` | Fournisseur LLM : `openai` ou `ollama` |
-| `OPENAI_API_KEY` | _(vide)_ | Clé API OpenAI — obligatoire si `AI_PROVIDER=openai` |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Modèle OpenAI à utiliser |
-| `OLLAMA_URL` | `http://localhost:11434` | URL du serveur Ollama — obligatoire si `AI_PROVIDER=ollama` |
-| `OLLAMA_MODEL` | `mistral` | Modèle Ollama à utiliser |
+| `GITHUB_TOKEN` | _(vide)_ | Token GitHub — **obligatoire** (même token que CI/CD) |
+| `GITHUB_MODEL` | `gpt-4o-mini` | Modèle GitHub Models à utiliser |
 
-### Configuration recommandée
+### Configuration
 
-**Production (OpenAI) :**
+**Aucune clé API supplémentaire requise.** Utilise ton Personal Access Token GitHub habituel :
+
 ```env
-AI_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini
+GITHUB_TOKEN=ghp_...        # ton token GitHub (même que pour CI/CD)
+GITHUB_MODEL=gpt-4o-mini    # gratuit en preview
 ```
 
-**Dev local (Ollama, gratuit) :**
-```bash
-# Installer Ollama : https://ollama.ai
-ollama pull mistral
-```
-```env
-AI_PROVIDER=ollama
-OLLAMA_URL=http://host.docker.internal:11434
-OLLAMA_MODEL=mistral
-```
+> **GitHub Models** est accessible sur `https://models.inference.ai.azure.com` avec le même `GITHUB_TOKEN` que tu utilises pour GitHub Actions. `gpt-4o-mini` est gratuit en preview.
 
 ---
 
@@ -80,21 +68,28 @@ Déclenche ou retourne (depuis le cache) l'analyse IA d'une annonce.
 **Réponse 200 :**
 ```json
 {
-  "id": 42,
-  "listing_id": 1337,
-  "model_used": "gpt-4o-mini",
-  "repairs_found": [
-    "Courroie de distribution changée à 120 000 km",
-    "Embrayage remplacé"
-  ],
-  "upcoming_maintenance": [
-    "Vidange (tous les 15 000 km — bientôt à prévoir)",
-    "Contrôle technique dans 1 an"
-  ],
-  "condition_summary": "Véhicule bien entretenu avec carnet de suivi. Quelques traces d'usure cosmétiques sans impact mécanique. Historique transparent.",
-  "risk_level": "low",
+  "id": 1,
+  "listing_id": 42,
+  "model": "gpt-4o-mini",
+  "status": "done",
   "created_at": "2025-01-15T10:30:00",
-  "is_premium": false
+  "is_premium": false,
+  "reponse": {
+    "id": 1,
+    "requete_id": 1,
+    "repairs_found": [
+      "Courroie de distribution changée à 120 000 km",
+      "Embrayage remplacé"
+    ],
+    "upcoming_maintenance": [
+      "Vidange (tous les 15 000 km — bientôt à prévoir)",
+      "Contrôle technique dans 1 an"
+    ],
+    "condition_summary": "Véhicule bien entretenu avec carnet de suivi. Quelques traces d'usure cosmétiques sans impact mécanique. Historique transparent.",
+    "risk_level": "low",
+    "created_at": "2025-01-15T10:30:00",
+    "is_premium": false
+  }
 }
 ```
 
@@ -133,20 +128,33 @@ Description:
 
 ---
 
-## Schéma DB : `listing_analyses`
+## Schéma DB
+
+Deux tables séparées : la **requête** (prompt envoyé) et la **réponse** (analyse structurée).
 
 ```sql
-CREATE TABLE listing_analyses (
+-- Requête envoyée au LLM
+CREATE TABLE requete_ia (
     id           INT AUTO_INCREMENT PRIMARY KEY,
-    listing_id   INT NOT NULL UNIQUE,
-    model_used   VARCHAR(100),
+    listing_id   INT NOT NULL,
+    prompt_text  TEXT NOT NULL,
+    model        VARCHAR(100) NOT NULL,
+    status       VARCHAR(20) DEFAULT 'pending',   -- pending | done | error
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (listing_id) REFERENCES listings(id)
+);
+
+-- Réponse structurée du LLM (1-to-1 avec requete_ia)
+CREATE TABLE reponse_ia (
+    id                   INT AUTO_INCREMENT PRIMARY KEY,
+    requete_id           INT NOT NULL UNIQUE,
     repairs_found        JSON,
     upcoming_maintenance JSON,
     condition_summary    TEXT,
-    risk_level   VARCHAR(20),
-    raw_response TEXT,
-    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (listing_id) REFERENCES listings(id)
+    risk_level           VARCHAR(20),    -- "low" | "medium" | "high"
+    raw_response         TEXT,
+    created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (requete_id) REFERENCES requete_ia(id)
 );
 ```
 
@@ -176,11 +184,11 @@ CREATE TABLE listing_analyses (
 
 | Fichier | Changement |
 |---------|------------|
-| `backend/models/__init__.py` | + classe `ListingAnalysis` |
-| `backend/schemas/__init__.py` | + `ListingAnalysisResponse` |
-| `backend/services/ai_service.py` | **nouveau** — logique LLM |
-| `backend/routers/analysis.py` | **nouveau** — endpoint REST |
+| `backend/models/__init__.py` | + classes `RequeteIA` + `ReponseIA` (remplace `ListingAnalysis`) |
+| `backend/schemas/__init__.py` | + `RequeteIAOut` + `ReponseIAOut` |
+| `backend/services/ai_service.py` | **nouveau** — GitHub Models API (GITHUB_TOKEN) |
+| `backend/routers/analysis.py` | **nouveau** — endpoint REST avec séparation requête/réponse |
 | `backend/main.py` | + `include_router(analysis_router)` |
-| `infra/docker-compose.dev.yml` | + env vars AI |
+| `infra/docker-compose.dev.yml` | + `GITHUB_TOKEN` + `GITHUB_MODEL` |
 | `frontend/src/api/client.js` | + `analyzeListingAI()` |
-| `frontend/src/components/ReliabilityModal.jsx` | + onglet "Analyse IA" |
+| `frontend/src/components/ReliabilityModal.jsx` | + onglet "Analyse IA", accès via `aiAnalysis.reponse.*` |
