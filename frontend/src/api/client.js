@@ -34,3 +34,5 @@ export const verifyEmail = (token) => request('POST', '/auth/verify-email', { to
 export const loginApi    = (email, password) => request('POST', '/auth/login', { email, password });
 export const getMe       = (token) => request('GET', '/auth/me', undefined, token);
 export const getSavedSearches = (token) => request('GET', '/users/me/searches', undefined, token);
+
+export const analyzeListingAI = (listingId) => request('POST', `/listings/${listingId}/analyze`);

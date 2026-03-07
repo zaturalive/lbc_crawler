@@ -2,6 +2,9 @@ from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integ
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
+
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -102,3 +105,19 @@ class Like(Base):
         Index("idx_likes_listing", "listing_id"),
         Index("uk_user_listing", "user_id", "listing_id", unique=True),
     )
+
+
+class ListingAnalysis(Base):
+    __tablename__ = "listing_analyses"
+
+    id                   = Column(Integer, primary_key=True)
+    listing_id           = Column(Integer, ForeignKey("listings.id"), nullable=False, unique=True)
+    model_used           = Column(String(100))
+    repairs_found        = Column(JSON)
+    upcoming_maintenance = Column(JSON)
+    condition_summary    = Column(Text)
+    risk_level           = Column(String(20))
+    raw_response         = Column(Text)
+    created_at           = Column(DateTime, default=func.now())
+
+    listing = relationship("Listing", backref="analysis", lazy="selectin")

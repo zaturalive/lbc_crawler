@@ -4,7 +4,6 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-
 class VehicleResponse(BaseModel):
     id: Optional[int] = None
     brand: str
@@ -126,4 +125,18 @@ class SearchSessionResponse(BaseModel):
     patterns: Optional[list] = None
     result_count: Optional[int] = None
     created_at: Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+
+class ListingAnalysisResponse(BaseModel):
+    id: int
+    listing_id: int
+    model_used: Optional[str] = None
+    repairs_found: Optional[list[str]] = None
+    upcoming_maintenance: Optional[list[str]] = None
+    condition_summary: Optional[str] = None
+    risk_level: Optional[str] = None
+    created_at: Optional[datetime] = None
+    is_premium: bool = False   # toujours False pour l'instant
+
     model_config = {"from_attributes": True}

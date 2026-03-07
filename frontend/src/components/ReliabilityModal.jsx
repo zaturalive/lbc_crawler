@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, ExternalLink, AlertTriangle } from 'lucide-react';
 import Badge from './ui/Badge';
+import { analyzeListingAI } from '../api/client';
 
 function parseIssue(issue) {
   const clean = issue.replace(/[\t\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
@@ -69,6 +70,23 @@ const TABS = [
 
 export default function ReliabilityModal({ listing, onClose }) {
   const [activeTab, setActiveTab] = useState('annonce');
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+
+  async function handleAnalyze() {
+    if (aiAnalysis) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const data = await analyzeListingAI(listing.id);
+      setAiAnalysis(data);
+    } catch (err) {
+      setAiError(err.message || 'Analyse IA indisponible');
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -129,6 +147,19 @@ export default function ReliabilityModal({ listing, onClose }) {
               {tab.label}
             </button>
           ))}
+          <button
+            onClick={() => { setActiveTab('analyse-ia'); handleAnalyze(); }}
+            className={`px-4 py-2.5 text-xs font-mono font-semibold transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
+              activeTab === 'analyse-ia'
+                ? 'text-fmc-accent border-fmc-accent'
+                : 'text-fmc-text-dim border-transparent hover:text-fmc-text'
+            }`}
+          >
+            ✨ Analyse IA
+            <span className="px-1.5 py-0.5 text-xs font-mono rounded-full bg-green-900/30 border border-green-500/50 text-green-400 leading-none">
+              Gratuit
+            </span>
+          </button>
         </div>
 
         {/* Scrollable body */}
@@ -365,9 +396,116 @@ export default function ReliabilityModal({ listing, onClose }) {
               )}
             </div>
           )}
-        </div>
+          {/* Tab 4 — Analyse IA */}
+          {activeTab === 'analyse-ia' && (
+            <div className="space-y-4">
+              {/* Header avec badge gratuit */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-mono font-semibold text-fmc-text flex items-center gap-2">
+                  <span className="text-fmc-accent">✨</span> Analyse IA de l'annonce
+                </h3>
+                <span className="px-2 py-0.5 text-xs font-mono rounded-full bg-green-900/30 border border-green-500/50 text-green-400">
+                  ✓ Gratuit
+                </span>
+              </div>
 
-        {/* Sticky footer — quick access LBC button */}
+              {/* Etat: pas encore charge */}
+              {!aiLoading && !aiAnalysis && !aiError && (
+                <div className="text-center py-6">
+                  <p className="text-fmc-text-dim text-xs font-mono mb-3">
+                    L'IA va analyser la description de cette annonce pour trouver les réparations effectuées,
+                    estimer les prochaines révisions et évaluer le risque.
+                  </p>
+                  <button
+                    onClick={handleAnalyze}
+                    className="fmc-btn-primary text-sm px-6 py-2"
+                  >
+                    ✨ Lancer l'analyse IA
+                  </button>
+                </div>
+              )}
+
+              {/* Loading */}
+              {aiLoading && (
+                <div className="flex flex-col items-center justify-center py-8 gap-3">
+                  <div className="w-8 h-8 border-2 border-fmc-accent border-t-transparent rounded-full animate-spin" />
+                  <p className="text-fmc-text-dim text-xs font-mono">Analyse en cours…</p>
+                </div>
+              )}
+
+              {/* Erreur */}
+              {aiError && (
+                <div className="rounded-md bg-red-900/20 border border-red-500/30 p-4">
+                  <p className="text-red-400 text-xs font-mono">{aiError}</p>
+                  <button onClick={handleAnalyze} className="mt-2 text-xs text-fmc-accent underline">Réessayer</button>
+                </div>
+              )}
+
+              {/* Resultats */}
+              {aiAnalysis && (
+                <div className="space-y-4">
+                  {/* Niveau de risque */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-fmc-text-dim">Risque global :</span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
+                      aiAnalysis.risk_level === 'low'  ? 'bg-green-900/30 text-green-400 border border-green-500/50' :
+                      aiAnalysis.risk_level === 'high' ? 'bg-red-900/30 text-red-400 border border-red-500/50' :
+                                                         'bg-yellow-900/30 text-yellow-400 border border-yellow-500/50'
+                    }`}>
+                      {aiAnalysis.risk_level === 'low' ? '✓ Faible' : aiAnalysis.risk_level === 'high' ? '⚠ Élevé' : '~ Modéré'}
+                    </span>
+                    {aiAnalysis.model_used && (
+                      <span className="text-xs text-fmc-text-dim font-mono ml-auto opacity-60">via {aiAnalysis.model_used}</span>
+                    )}
+                  </div>
+
+                  {/* Resume */}
+                  {aiAnalysis.condition_summary && (
+                    <div className="fmc-card p-3 space-y-1">
+                      <p className="text-xs font-mono font-semibold text-fmc-accent">📋 État général</p>
+                      <p className="text-xs text-fmc-text leading-relaxed">{aiAnalysis.condition_summary}</p>
+                    </div>
+                  )}
+
+                  {/* Reparations effectuees */}
+                  {aiAnalysis.repairs_found && aiAnalysis.repairs_found.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-mono font-semibold text-fmc-accent">🔧 Réparations effectuées</p>
+                      <ul className="space-y-1">
+                        {aiAnalysis.repairs_found.map((r, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-fmc-text font-mono">
+                            <span className="text-green-400 mt-0.5">✓</span>
+                            <span>{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Revisions a venir */}
+                  {aiAnalysis.upcoming_maintenance && aiAnalysis.upcoming_maintenance.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-mono font-semibold text-fmc-accent">🔮 Révisions probables à prévoir</p>
+                      <ul className="space-y-1">
+                        {aiAnalysis.upcoming_maintenance.map((m, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-fmc-text font-mono">
+                            <span className="text-yellow-400 mt-0.5">→</span>
+                            <span>{m}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Aucune reparation trouvee */}
+                  {aiAnalysis.repairs_found && aiAnalysis.repairs_found.length === 0 && (
+                    <p className="text-xs text-fmc-text-dim font-mono italic">Aucune réparation mentionnée dans l'annonce.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="bg-fmc-panel border-t border-fmc-accent-deep/60 px-6 py-3 flex-shrink-0">
           <a
             href={url}

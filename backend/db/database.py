@@ -15,6 +15,14 @@ engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
+async def create_tables() -> None:
+    """Create all tables that do not yet exist (idempotent)."""
+    from models import Base  # local import avoids circular dependency at module load
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session

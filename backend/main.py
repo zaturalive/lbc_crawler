@@ -1,14 +1,24 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from db.database import create_tables
 from routers import admin, listings, patterns, search, vehicles
+from routers.analysis import router as analysis_router
 from routers.auth import router as auth_router
 from routers.likes import router as likes_router
 from routers.users import router as users_router
 
-app = FastAPI(title="find_my_car API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await create_tables()
+    yield
+
+
+app = FastAPI(title="find_my_car API", version="1.0.0", lifespan=lifespan)
 
 cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
@@ -27,6 +37,7 @@ app.include_router(admin.router)
 app.include_router(likes_router, tags=["likes"])
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(analysis_router)
 
 
 @app.get("/health")
