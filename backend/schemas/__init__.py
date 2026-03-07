@@ -1,7 +1,8 @@
+import re
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 
 class VehicleResponse(BaseModel):
@@ -13,6 +14,7 @@ class VehicleResponse(BaseModel):
     common_issues: Optional[list[str]] = None
     known_issues_text: Optional[list] = None
     source_url: Optional[str] = None
+    reliability_rank: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -54,13 +56,17 @@ class SearchRequest(BaseModel):
     fuel: Optional[str] = None
     city: Optional[str] = None
     radius: Optional[int] = None  # km
+    sort_by: Optional[str] = None   # price_asc | price_desc | recent | oldest | None (pertinence)
+    condition: Optional[str] = None  # excellent | good | fair | minor_repairs | major_repairs | damaged | not_running
     pattern_ids: list[int] = []
     custom_regex: Optional[str] = None
+    limit: int = Field(default=100, ge=50, le=600)
 
 
 class SearchResult(BaseModel):
     session_id: int
     count: int
+    limit: int
     listings: list[ListingResponse]
 
 
@@ -82,7 +88,42 @@ class PatternCreate(BaseModel):
 
 class LikeResponse(BaseModel):
     id: int
-    user_id: int
+    user_id: Optional[int] = None
     listing_id: int
     created_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+
+class UserCreate(BaseModel):
+    email: str = Field(..., min_length=5, max_length=254)
+    password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        if not re.match(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$', v):
+            raise ValueError('Format email invalide')
+        return v.lower().strip()
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    is_verified: bool
+    created_at: Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
+
+class SearchSessionResponse(BaseModel):
+    id: int
+    filters: Optional[dict] = None
+    patterns: Optional[list] = None
+    result_count: Optional[int] = None
+    created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}

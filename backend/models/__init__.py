@@ -19,6 +19,7 @@ class Vehicle(Base):
     common_issues     = Column(JSON)
     known_issues_text = Column(JSON)
     source_url        = Column(String(500))
+    reliability_rank  = Column(String(20), nullable=True)
     fuel_type         = Column(String(50))
     scraped_at        = Column(DateTime, server_default=func.now())
 
@@ -64,10 +65,22 @@ class RegexPattern(Base):
     created_at  = Column(DateTime, server_default=func.now())
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id                 = Column(Integer, primary_key=True, autoincrement=True)
+    email              = Column(String(255), unique=True, nullable=False)
+    hashed_password    = Column(String(255), nullable=False)
+    is_verified        = Column(Boolean, default=False)
+    verification_token = Column(String(100), nullable=True)
+    created_at         = Column(DateTime, server_default=func.now())
+
+
 class SearchSession(Base):
     __tablename__ = "search_sessions"
 
     id           = Column(Integer, primary_key=True, autoincrement=True)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     filters      = Column(JSON)
     patterns     = Column(JSON)
     result_count = Column(Integer, default=0)
@@ -78,7 +91,7 @@ class Like(Base):
     __tablename__ = "likes"
 
     id         = Column(Integer, primary_key=True, autoincrement=True)
-    user_id    = Column(Integer, nullable=False, default=1)
+    user_id    = Column(Integer, nullable=True)
     listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, ExternalLink } from 'lucide-react';
+import { X, ExternalLink, AlertTriangle } from 'lucide-react';
 import Badge from './ui/Badge';
 
 function parseIssue(issue) {
@@ -10,6 +10,41 @@ function parseIssue(issue) {
     title: clean.slice(0, colonIdx).trim(),
     description: clean.slice(colonIdx + 1).trim(),
   };
+}
+
+/**
+ * Parse a detailed issue block like:
+ * "Embrayage : texte... Bruits parasites : texte... GPS/électronique : texte..."
+ * Strategy: split on ". " followed by a title-like pattern (short phrase + " : ")
+ * Returns array of { subtitle, text }
+ */
+function parseDetailedIssue(raw) {
+  // Normalize line breaks and extra spaces
+  const clean = raw.replace(/\r\n|\r/g, ' ').replace(/\s{2,}/g, ' ').trim();
+
+  // Split on sentence boundary before a new "Title : " pattern
+  // A title is: 2-60 chars with no colon, followed by " : "
+  // We split on ". " or ". \n" right before such a title
+  const parts = clean.split(/\.\s+(?=[^.:]{2,60}?\s*:\s)/);
+
+  const bullets = parts
+    .map(part => {
+      const colonPos = part.indexOf(' : ');
+      if (colonPos === -1 || colonPos > 70) {
+        // No clear title — keep as plain text if substantial
+        return part.trim().length > 15 ? { subtitle: '', text: part.trim().replace(/\.$/, '') } : null;
+      }
+      const subtitle = part.slice(0, colonPos).trim();
+      const text = part.slice(colonPos + 3).trim().replace(/\.$/, '');
+      // Reject if "subtitle" looks like mid-sentence (contains '. ' or is too long)
+      if (subtitle.includes('. ') || subtitle.length > 60) {
+        return { subtitle: '', text: part.trim().replace(/\.$/, '') };
+      }
+      return text.length > 5 ? { subtitle, text } : null;
+    })
+    .filter(Boolean);
+
+  return bullets.length > 0 ? bullets : [{ subtitle: '', text: clean }];
 }
 
 const scoreVariant = (score) => {
@@ -201,6 +236,12 @@ export default function ReliabilityModal({ listing, onClose }) {
                 </h3>
                 {vehicle ? (
                   <div className="space-y-2">
+                    {vehicle.reliability_rank && (
+                      <div className="flex items-center gap-2 p-2 rounded bg-zinc-800 border border-zinc-700">
+                        <span className="text-xs text-zinc-400">Classement fiabilite :</span>
+                        <span className="text-sm font-semibold text-green-400 font-mono">{vehicle.reliability_rank}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3">
                       <Badge variant={scoreVariant(vehicle.reliability_score)} className="text-base px-4 py-1.5 font-mono">
                         {vehicle.reliability_score !== null && vehicle.reliability_score !== undefined
@@ -255,10 +296,21 @@ export default function ReliabilityModal({ listing, onClose }) {
                   <h3 className="text-xs font-mono font-semibold text-fmc-text-dim uppercase tracking-widest mb-3">
                     <span className="text-fmc-accent">◈</span> Analyse detaillee
                   </h3>
-                  <div className="space-y-3">
-                    {knownIssuesText.map((paragraph, i) => (
-                      <p key={i} className="text-xs text-fmc-text-dim leading-relaxed">{paragraph}</p>
-                    ))}
+                  <div className="space-y-2">
+                    {knownIssuesText.flatMap((paragraph, i) => {
+                      const bullets = parseDetailedIssue(paragraph);
+                      return bullets.map((bullet, j) => (
+                        <div key={`${i}-${j}`} className="rounded border border-fmc-accent-deep/30 bg-fmc-panel/60 overflow-hidden">
+                          {bullet.subtitle && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-fmc-accent-deep/20 border-b border-fmc-accent-deep/30">
+                              <AlertTriangle className="h-3 w-3 text-fmc-accent flex-shrink-0" />
+                              <span className="text-xs font-mono font-semibold text-fmc-accent">{bullet.subtitle}</span>
+                            </div>
+                          )}
+                          <p className="px-3 py-2 text-xs text-fmc-text-dim leading-relaxed">{bullet.text}</p>
+                        </div>
+                      ));
+                    })}
                   </div>
                 </section>
               )}

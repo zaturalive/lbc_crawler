@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import PatternSelector from './PatternSelector';
 import Button from './ui/Button';
 import Input from './ui/Input';
+import NumberInput from './ui/NumberInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/Select';
 import { Save, Trash2, X as XIcon } from 'lucide-react';
 
@@ -27,11 +27,31 @@ const RADIUS_OPTIONS = [
   { value: '100', label: '100 km' },
 ];
 
+const SORT_OPTIONS = [
+  { value: '__any__', label: 'Pertinence (défaut)' },
+  { value: 'price_asc', label: 'Prix croissant' },
+  { value: 'price_desc', label: 'Prix décroissant' },
+  { value: 'recent', label: 'Les plus récents' },
+  { value: 'oldest', label: 'Les plus anciens' },
+];
+
+const CONDITION_OPTIONS = [
+  { value: '__any__', label: 'Tous les états' },
+  { value: 'excellent', label: 'Excellent état (proche du neuf)' },
+  { value: 'good', label: 'Bon état général' },
+  { value: 'fair', label: "Traces d'usure normales" },
+  { value: 'minor_repairs', label: 'Réparations mineures à prévoir' },
+  { value: 'major_repairs', label: 'Réparations majeures à prévoir' },
+  { value: 'damaged', label: 'Endommagé' },
+  { value: 'not_running', label: 'Non roulant' },
+];
+
 const EMPTY_FORM = {
   brand: '', model: '', price_min: '', price_max: '',
   mileage_min: '', mileage_max: '', year_min: '',
   horsepower_min: '', horsepower_max: '', gearbox: '', fuel: '',
-  city: '', radius: '30',
+  city: '', radius: '30', limit: '100',
+  sort_by: '', condition: '',
 };
 
 function loadPresets() {
@@ -41,8 +61,6 @@ function loadPresets() {
 
 export default function SearchForm({ onResults, onLoading, initialValues = null }) {
   const [form, setForm] = useState({ ...EMPTY_FORM });
-  const [selectedPatterns, setSelectedPatterns] = useState([]);
-  const [customRegex, setCustomRegex] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -56,16 +74,14 @@ export default function SearchForm({ onResults, onLoading, initialValues = null 
 
   useEffect(() => {
     if (!initialValues) return;
-    const { selectedPatterns: sp, customRegex: cr, ...rest } = initialValues;
-    setForm(prev => ({ ...EMPTY_FORM, ...rest }));
-    if (sp) setSelectedPatterns(sp);
-    if (cr) setCustomRegex(cr);
+    const cleaned = Object.fromEntries(
+      Object.entries(initialValues).map(([k, v]) => [k, v == null ? '' : String(v)])
+    );
+    setForm(prev => ({ ...EMPTY_FORM, ...cleaned }));
   }, [initialValues]);
 
   function handleReset() {
     setForm({ ...EMPTY_FORM });
-    setSelectedPatterns([]);
-    setCustomRegex('');
     setError('');
   }
 
@@ -75,7 +91,7 @@ export default function SearchForm({ onResults, onLoading, initialValues = null 
     const entry = {
       id: Date.now(),
       name: presetName.trim(),
-      params: { ...form, selectedPatterns, customRegex },
+      params: { ...form },
     };
     const updated = [...presets, entry];
     setPresets(updated);
@@ -85,10 +101,8 @@ export default function SearchForm({ onResults, onLoading, initialValues = null 
   }
 
   function loadPreset(preset) {
-    const { selectedPatterns: sp, customRegex: cr, ...rest } = preset.params;
+    const { ...rest } = preset.params;
     setForm({ ...EMPTY_FORM, ...rest });
-    setSelectedPatterns(sp || []);
-    setCustomRegex(cr || '');
   }
 
   function deletePreset(id) {
@@ -118,8 +132,9 @@ export default function SearchForm({ onResults, onLoading, initialValues = null 
         fuel: (form.fuel && form.fuel !== '__any__') ? form.fuel : null,
         city: form.city || null,
         radius: form.city ? Number(form.radius) : null,
-        pattern_ids: selectedPatterns,
-        custom_regex: customRegex || null,
+        limit: parseInt(form.limit) || 100,
+        sort_by: (form.sort_by && form.sort_by !== '__any__') ? form.sort_by : null,
+        condition: (form.condition && form.condition !== '__any__') ? form.condition : null,
       };
       const result = await searchListings(payload);
       onResults(result);
@@ -182,41 +197,41 @@ export default function SearchForm({ onResults, onLoading, initialValues = null 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-2 min-w-0">
           <label className="text-sm font-semibold text-fmc-text">Prix min (€)</label>
-          <Input
-            type="number"
-            min="0"
+          <NumberInput
+            min={0}
+            step={500}
             value={form.price_min}
-            onChange={e => set('price_min', e.target.value)}
+            onChange={v => set('price_min', v)}
             placeholder="0"
           />
         </div>
         <div className="space-y-2 min-w-0">
           <label className="text-sm font-semibold text-fmc-text">Prix max (€)</label>
-          <Input
-            type="number"
-            min="0"
+          <NumberInput
+            min={0}
+            step={500}
             value={form.price_max}
-            onChange={e => set('price_max', e.target.value)}
+            onChange={v => set('price_max', v)}
             placeholder="15000"
           />
         </div>
         <div className="space-y-2 min-w-0">
           <label className="text-sm font-semibold text-fmc-text">Kilométrage min</label>
-          <Input
-            type="number"
-            min="0"
+          <NumberInput
+            min={0}
+            step={10000}
             value={form.mileage_min}
-            onChange={e => set('mileage_min', e.target.value)}
+            onChange={v => set('mileage_min', v)}
             placeholder="50000"
           />
         </div>
         <div className="space-y-2 min-w-0">
           <label className="text-sm font-semibold text-fmc-text">Kilométrage max</label>
-          <Input
-            type="number"
-            min="0"
+          <NumberInput
+            min={0}
+            step={10000}
             value={form.mileage_max}
-            onChange={e => set('mileage_max', e.target.value)}
+            onChange={v => set('mileage_max', v)}
             placeholder="150000"
           />
         </div>
@@ -225,32 +240,32 @@ export default function SearchForm({ onResults, onLoading, initialValues = null 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-2 min-w-0">
           <label className="text-sm font-semibold text-fmc-text">Année min</label>
-          <Input
-            type="number"
-            min="1990"
+          <NumberInput
+            min={1990}
             max={new Date().getFullYear()}
+            step={1}
             value={form.year_min}
-            onChange={e => set('year_min', e.target.value)}
+            onChange={v => set('year_min', v)}
             placeholder="2010"
           />
         </div>
         <div className="space-y-2 min-w-0">
           <label className="text-sm font-semibold text-fmc-text">Chevaux min</label>
-          <Input
-            type="number"
-            min="0"
+          <NumberInput
+            min={0}
+            step={10}
             value={form.horsepower_min}
-            onChange={e => set('horsepower_min', e.target.value)}
+            onChange={v => set('horsepower_min', v)}
             placeholder="70"
           />
         </div>
         <div className="space-y-2 min-w-0">
           <label className="text-sm font-semibold text-fmc-text">Chevaux max</label>
-          <Input
-            type="number"
-            min="0"
+          <NumberInput
+            min={0}
+            step={10}
             value={form.horsepower_max}
-            onChange={e => set('horsepower_max', e.target.value)}
+            onChange={v => set('horsepower_max', v)}
             placeholder="150"
           />
         </div>
@@ -278,14 +293,47 @@ export default function SearchForm({ onResults, onLoading, initialValues = null 
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-2 min-w-0">
+          <label className="text-sm font-semibold text-fmc-text">État du véhicule</label>
+          <Select value={form.condition} onValueChange={val => set('condition', val)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Tous les états" />
+            </SelectTrigger>
+            <SelectContent>
+              {CONDITION_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2 min-w-0">
+          <label className="text-sm font-semibold text-fmc-text">Trier par</label>
+          <Select value={form.sort_by} onValueChange={val => set('sort_by', val)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Pertinence" />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <PatternSelector
-        selected={selectedPatterns}
-        onChange={setSelectedPatterns}
-        customRegex={customRegex}
-        onCustomRegexChange={setCustomRegex}
-      />
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-semibold text-fmc-text">Nombre d'annonces</label>
+        <Select value={form.limit} onValueChange={v => setForm(f => ({ ...f, limit: v }))}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[50, 100, 150, 200, 300, 400, 500, 600].map(n => (
+              <SelectItem key={n} value={String(n)}>{n} annonces</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {error && (
         <div className="rounded-md bg-red-900/20 p-4">

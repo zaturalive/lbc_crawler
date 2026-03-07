@@ -24,13 +24,13 @@ export const deletePattern = (id) => request('DELETE', `/patterns/${id}`);
 export const getVehicle = (brand, model) =>
   request('GET', `/vehicles?brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}`);
 
-export const getLikes    = (token)   => request('GET', '/likes', undefined, token);
-export const addLike     = (id, token) => request('POST',   `/listings/${id}/like`, undefined, token);
-export const removeLike  = (id, token) => request('DELETE',  `/listings/${id}/like`, undefined, token);
+export const getLikes         = (token)   => request('GET', '/likes', undefined, token);
+export const getLikedListings = ()         => request('GET', '/likes/listings');
+export const addLike          = (id, token) => request('POST',   `/listings/${id}/like`, undefined, token);
+export const removeLike       = (id, token) => request('DELETE',  `/listings/${id}/like`, undefined, token);
 
 export const register    = (email, password) => request('POST', '/auth/register', { email, password });
 export const verifyEmail = (token) => request('POST', '/auth/verify-email', { token });
 export const loginApi    = (email, password) => request('POST', '/auth/login', { email, password });
 export const getMe       = (token) => request('GET', '/auth/me', undefined, token);
 export const getSavedSearches = (token) => request('GET', '/users/me/searches', undefined, token);
-export const getLikedListings = (token) => request('GET', '/likes', undefined, token);

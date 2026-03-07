@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, X, SlidersHorizontal } from 'lucide-react';
+import NumberInput from './ui/NumberInput';
 
 export default function ListingsFilterBar({ listings, onFiltered }) {
   const [titleSearch, setTitleSearch]       = useState('');
@@ -83,15 +84,14 @@ export default function ListingsFilterBar({ listings, onFiltered }) {
 
       {/* km min */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <span className="text-fmc-text-dim whitespace-nowrap">km min</span>
-        <input
-          type="number"
-          min="0"
+        <span className="text-fmc-text-dim whitespace-nowrap text-xs">km min</span>
+        <NumberInput
+          min={0}
+          step={10000}
           value={kmMin}
-          onChange={e => setKmMin(e.target.value)}
+          onChange={v => setKmMin(v)}
           placeholder="0"
-          className="fmc-input w-20 py-1 text-xs"
-          style={{ height: '28px' }}
+          className="w-32 text-xs"
         />
       </div>
 

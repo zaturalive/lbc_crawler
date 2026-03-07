@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -5,7 +6,14 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+_logger = logging.getLogger(__name__)
+
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+if not os.getenv("SECRET_KEY"):
+    _logger.warning(
+        "SECRET_KEY not set via env var — using insecure default. "
+        "Set SECRET_KEY in production!"
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 jours
 

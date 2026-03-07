@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from typing import Optional
 
 import httpx
@@ -34,6 +35,7 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
         "fuel": req.fuel,
         "city": req.city,
         "radius": req.radius,
+        "condition": req.condition,
         "pattern_ids": req.pattern_ids,
         "custom_regex": req.custom_regex,
     }
@@ -53,6 +55,20 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
     if req.pattern_ids:
         upserted = [l for l in upserted if l.matched_keywords]
 
+    # Tri des résultats
+    if req.sort_by == 'price_asc':
+        upserted.sort(key=lambda l: l.price or 0)
+    elif req.sort_by == 'price_desc':
+        upserted.sort(key=lambda l: l.price or 0, reverse=True)
+    elif req.sort_by == 'recent':
+        upserted.sort(key=lambda l: l.scraped_at or datetime.min, reverse=True)
+    elif req.sort_by == 'oldest':
+        upserted.sort(key=lambda l: l.scraped_at or datetime.max)
+    # 'pertinence' = order du scraper, pas de tri
+
+    # Appliquer la limite demandée par le client
+    upserted = upserted[:req.limit]
+
     session = SearchSession(
         filters={k: v for k, v in req.model_dump().items() if k != "pattern_ids"},
         patterns=[p.name for p in patterns],
@@ -62,7 +78,7 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
     await db.commit()
     await db.refresh(session)
 
-    return SearchResult(session_id=session.id, count=len(upserted), listings=upserted)
+    return SearchResult(session_id=session.id, count=len(upserted), limit=req.limit, listings=upserted)
 
 
 async def _call_scraper(payload: dict) -> list[dict]:
@@ -105,11 +121,12 @@ async def _resolve_vehicle(brand: str, model: str, db: AsyncSession) -> Optional
     if vehicle:
         return vehicle
     # 2. Fuzzy: brand exact (case-insensitive) + model LIKE '%model%' avec score
+    escaped_model = model.lower().replace('%', r'\%').replace('_', r'\_')
     result = await db.execute(
         select(Vehicle)
         .where(
             func.lower(Vehicle.brand) == brand.lower(),
-            func.lower(Vehicle.model).like(f"%{model.lower()}%"),
+            func.lower(Vehicle.model).like(f"%{escaped_model}%"),
             Vehicle.reliability_score.isnot(None),
         )
         .order_by(func.length(Vehicle.model))  # préférer le modèle le plus court

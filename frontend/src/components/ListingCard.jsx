@@ -30,7 +30,7 @@ export default function ListingCard({ listing, onOpenModal, isLiked = false, onT
           aria-label={isLiked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
           onClick={e => {
             e.stopPropagation();
-            onToggleLike && onToggleLike(listing.lbc_id || listing.id);
+            onToggleLike && onToggleLike(listing.id);
           }}
           className={`absolute top-3 right-3 p-1.5 rounded-md border transition-all duration-200 ${
             isLiked

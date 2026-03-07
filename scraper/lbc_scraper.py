@@ -27,6 +27,16 @@ FUEL_LBC_MAP = {
     "hybride": "5",
 }
 
+CONDITION_LBC_MAP = {
+    "excellent": "1",       # Excellent etat (proche du neuf)
+    "good": "2",            # Bon etat general
+    "fair": "3",            # Traces d'usure normales
+    "minor_repairs": "4",   # Reparations mineures a prevoir
+    "major_repairs": "5",   # Reparations majeures a prevoir
+    "damaged": "6",         # Endommage
+    "not_running": "7",     # Non roulant
+}
+
 
 @dataclass
 class SearchFilters:
@@ -43,6 +53,7 @@ class SearchFilters:
     fuel: Optional[str] = None
     city: Optional[str] = None
     radius: Optional[int] = None  # km, default 30
+    condition: Optional[str] = None
     extra_patterns: list[dict] = field(default_factory=list)
 
 
@@ -159,6 +170,9 @@ class LBCScraper:
                 
                 if filters.fuel is not None and filters.fuel in FUEL_LBC_MAP:
                     search_kwargs["fuel"] = [FUEL_LBC_MAP[filters.fuel]]
+
+                if filters.condition is not None and filters.condition in CONDITION_LBC_MAP:
+                    search_kwargs["vehicle_condition"] = [CONDITION_LBC_MAP[filters.condition]]
 
                 if city_coords is not None:
                     lat, lng = city_coords

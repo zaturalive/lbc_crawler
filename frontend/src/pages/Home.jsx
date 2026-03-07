@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import ResultsGrid from '../components/ResultsGrid';
 import SearchForm from '../components/SearchForm';
 import Header from '../components/Header';
@@ -12,6 +13,8 @@ export default function Home() {
   const [likedIds, setLikedIds] = useState([]);
   const location = useLocation();
   const initialValues = location.state?.loadSearch || null;
+  const { token } = useAuth();
+  const [likeToast, setLikeToast] = useState(false);
 
   // Charge les likes au démarrage (fail silently si l'API ne répond pas)
   useEffect(() => {
@@ -25,6 +28,11 @@ export default function Home() {
   }, []);
 
   async function handleToggleLike(listingId) {
+    if (!token) {
+      setLikeToast(true);
+      setTimeout(() => setLikeToast(false), 3500);
+      return;
+    }
     const { addLike, removeLike } = await import('../api/client');
     const isCurrentlyLiked = likedIds.includes(listingId);
     // Optimistic update
@@ -100,6 +108,21 @@ export default function Home() {
               onToggleLike={handleToggleLike}
             />
           </main>
+        </div>
+      )}
+
+      {likeToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="flex items-center gap-3 bg-fmc-surface border border-fmc-accent/50 rounded-lg px-5 py-3 shadow-xl font-mono text-sm text-fmc-text">
+            <span className="text-fmc-accent text-lg">♥</span>
+            <span>
+              <span className="font-semibold text-fmc-accent">Inscrivez-vous</span>{' '}
+              pour mémoriser vos favoris
+            </span>
+            <a href="/register" className="ml-2 underline text-fmc-accent hover:text-fmc-text transition-colors text-xs whitespace-nowrap">
+              S'inscrire →
+            </a>
+          </div>
         </div>
       )}
 

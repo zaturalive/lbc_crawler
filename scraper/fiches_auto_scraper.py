@@ -1,6 +1,7 @@
 import logging
 import re
 import time
+import unicodedata
 from typing import Optional
 from urllib.parse import urljoin
 
@@ -198,11 +199,107 @@ def scrape_vehicle_page(url: str, brand_slug: str, model_name: str = None, year_
     }
 
 
+def _normalize(text: str) -> str:
+    """Lowercase, remove accents, collapse spaces."""
+    nfkd = unicodedata.normalize("NFKD", text)
+    ascii_str = nfkd.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"\s+", " ", ascii_str.lower()).strip()
+
+
+RANKING_PAGES = [
+    ("mini-citadines", "https://www.fiches-auto.fr/articles-auto/classement-comparatif-fiabilite/mini-citadines.php"),
+    ("citadines",      "https://www.fiches-auto.fr/articles-auto/classement-comparatif-fiabilite/citadines.php"),
+    ("compactes",      "https://www.fiches-auto.fr/articles-auto/classement-comparatif-fiabilite/compactes.php"),
+    ("berlines",       "https://www.fiches-auto.fr/articles-auto/classement-comparatif-fiabilite/berlines.php"),
+    ("monospaces-compacts", "https://www.fiches-auto.fr/articles-auto/classement-comparatif-fiabilite/monospaces-compacts.php"),
+    ("monospaces",     "https://www.fiches-auto.fr/articles-auto/classement-comparatif-fiabilite/monospaces.php"),
+    ("4x4-suv",        "https://www.fiches-auto.fr/articles-auto/classement-comparatif-fiabilite/4x4.php"),
+    ("coupes",         "https://www.fiches-auto.fr/articles-auto/classement-comparatif-fiabilite/coupes.php"),
+    ("cabriolets",     "https://www.fiches-auto.fr/articles-auto/classement-comparatif-fiabilite/cabriolets.php"),
+]
+
+
+def scrape_reliability_ranking() -> dict:
+    """
+    Scrape the 9 fiches-auto.fr reliability ranking sub-pages.
+
+    Returns a dict keyed by (brand_normalized, model_normalized) with value
+    (score_int, category_str) where score_int = round(float(X.X) * 10) (scale 0-100).
+
+    Example: { ("suzuki", "swift 4"): (90, "citadines") }
+    Scores are decimal (e.g. 8.9/10 -> 89, 9/10 -> 90).
+    """
+    ranking: dict = {}
+
+    for category, url in RANKING_PAGES:
+        try:
+            resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.content, "html.parser", from_encoding="iso-8859-1")
+        except Exception as exc:
+            logger.warning("scrape_reliability_ranking [%s] failed: %s", category, exc)
+            time.sleep(RATE_LIMIT)
+            continue
+
+        # Strategy: find all <td> with background-color in style that contain X/10 or X.X/10.
+        # Each such TD is the score cell; its parent <tr> also contains the vehicle TD.
+        entries_found = 0
+        for score_td in soup.find_all("td", style=True):
+            style = score_td.get("style", "")
+            if "background-color" not in style:
+                continue
+            score_text = score_td.get_text(separator=" ", strip=True)
+            score_match = re.search(r"(\d+(?:\.\d+)?)/10", score_text)
+            if not score_match:
+                continue
+
+            # Get parent <tr> and find vehicle <td> (the sibling with a "Fiabilite" link)
+            tr = score_td.parent
+            if not tr or tr.name != "tr":
+                continue
+
+            vehicle_link = None
+            for td in tr.find_all("td"):
+                link = td.find("a", href=True)
+                if link and "fiabilit" in link.get_text().lower():
+                    vehicle_link = link
+                    break
+
+            if not vehicle_link:
+                continue
+
+            link_text = vehicle_link.get_text(separator=" ", strip=True)
+            # Parse: "Fiabilite Brand Model (+)" -> brand + model
+            cleaned = re.sub(r"fiabilit[eé]\s+", "", link_text, flags=re.IGNORECASE).strip()
+            cleaned = re.sub(r"\s*\([+-]\)\s*$", "", cleaned).strip()
+            parts = cleaned.split(None, 1)
+            if not parts:
+                continue
+            brand_n = _normalize(parts[0])
+            model_n = _normalize(parts[1]) if len(parts) > 1 else ""
+            if not brand_n:
+                continue
+
+            score_int = round(float(score_match.group(1)) * 10)
+            ranking[(brand_n, model_n)] = (score_int, category)
+            entries_found += 1
+
+        logger.info("scrape_reliability_ranking [%s]: %d entries found", category, entries_found)
+        time.sleep(RATE_LIMIT)
+
+    logger.info("scrape_reliability_ranking: %d total entries parsed", len(ranking))
+    return ranking
+
+
 def bulk_scrape_vehicles(progress_callback=None) -> list[dict]:
     """Scrape all brands and models. Returns list of vehicle dicts."""
     vehicles = []
     brand_urls = scrape_all_brands()
     logger.info("Found %d brands to scrape", len(brand_urls))
+
+    # Pre-fetch reliability ranking once for all vehicles
+    reliability_map = scrape_reliability_ranking()
+    logger.info("Reliability ranking loaded: %d entries", len(reliability_map))
 
     for brand_url in brand_urls:
         models = scrape_brand_models(brand_url)
@@ -217,9 +314,37 @@ def bulk_scrape_vehicles(progress_callback=None) -> list[dict]:
                 year_end=m.get("year_end"),
             )
             if vehicle:
+                # Enrich with reliability score and rank if available
+                brand_n = _normalize(vehicle["brand"])
+                model_n = _normalize(vehicle["model"])
+
+                # Try exact match first
+                rank_info = reliability_map.get((brand_n, model_n))
+
+                # Fallback: partial match on first word of model
+                if not rank_info:
+                    model_short = model_n.split()[0] if model_n else ""
+                    for (b, m_key), info in reliability_map.items():
+                        if b == brand_n and model_short and (
+                            m_key.startswith(model_short) or model_short.startswith(m_key)
+                        ):
+                            rank_info = info
+                            break
+
+                if rank_info:
+                    score, category = rank_info
+                    vehicle["reliability_score"] = score    # 0-100 (e.g. 90 for 9/10)
+                    vehicle["reliability_rank"] = category  # e.g. "citadines"
+                else:
+                    vehicle["reliability_rank"] = None
+
                 vehicles.append(vehicle)
                 if progress_callback:
                     progress_callback(vehicle)
-                logger.info("Scraped: %s %s", vehicle["brand"], vehicle["model"])
+                logger.info(
+                    "Scraped: %s %s (score: %s, rank: %s)",
+                    vehicle["brand"], vehicle["model"],
+                    vehicle.get("reliability_score"), vehicle.get("reliability_rank"),
+                )
 
     return vehicles

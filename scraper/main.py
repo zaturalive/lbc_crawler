@@ -34,6 +34,7 @@ class ScrapeRequest(BaseModel):
     fuel: Optional[str] = None
     city: Optional[str] = None
     radius: Optional[int] = None  # km, default 30
+    condition: Optional[str] = None
     patterns: list[dict] = []
     custom_regex: Optional[str] = None
 
@@ -67,6 +68,7 @@ def scrape(req: ScrapeRequest):
         fuel=req.fuel,
         city=req.city,
         radius=req.radius,
+        condition=req.condition,
         extra_patterns=extra,
     )
     try:

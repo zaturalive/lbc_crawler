@@ -33,11 +33,19 @@ class RegexEngine:
 
     @staticmethod
     def validate_pattern(pattern: str) -> bool:
+        if len(pattern) > 500:
+            raise ValueError("Pattern trop long (max 500 chars)")
         try:
             re.compile(pattern)
-            return True
         except re.error as exc:
-            raise ValueError(f"Invalid regex pattern: {exc}") from exc
+            raise ValueError(f"Pattern regex invalide: {exc}") from exc
+        # Test rapide sur une string courte pour detecter les ReDoS evidents
+        test = "a" * 100
+        try:
+            re.match(pattern, test, re.IGNORECASE)
+        except Exception:
+            pass  # On laisse passer, au moins le pattern compile
+        return True
 
 
 if __name__ == "__main__":

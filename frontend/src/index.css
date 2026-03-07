@@ -223,9 +223,21 @@ body {
    ══════════════════════════════════════════ */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: inner-spin-button;
+  appearance: auto;
   opacity: 1;
   cursor: pointer;
-  filter: invert(45%) sepia(60%) saturate(600%) hue-rotate(295deg) brightness(0.9);
+  width: 18px;
+  background: var(--color-fmc-panel, #1a1a2e);
+  border-left: 1px solid var(--color-fmc-border, #2d2d4e);
+  filter: invert(55%) sepia(80%) saturate(500%) hue-rotate(250deg) brightness(1.1);
+  transition: filter 0.15s ease;
+}
+input[type="number"]:hover::-webkit-inner-spin-button,
+input[type="number"]:hover::-webkit-outer-spin-button,
+input[type="number"]:focus::-webkit-inner-spin-button,
+input[type="number"]:focus::-webkit-outer-spin-button {
+  filter: invert(55%) sepia(100%) saturate(700%) hue-rotate(250deg) brightness(1.3);
 }
 
 /* ══════════════════════════════════════════

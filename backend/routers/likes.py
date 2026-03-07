@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from sqlalchemy.dialects.mysql import insert
+from sqlalchemy.orm import selectinload
 
 from db.database import get_db
-from models import Like, Listing
-from schemas import LikeResponse
+from models import Like, Listing, Vehicle
+from schemas import LikeResponse, ListingResponse, VehicleResponse
 
 router = APIRouter()
 
@@ -43,8 +44,29 @@ async def unlike_listing(listing_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/likes", response_model=list[int])
 async def get_liked_listing_ids(db: AsyncSession = Depends(get_db)):
-    """Retourne la liste des listing_id likes par l'utilisateur courant."""
+    """Retourne la liste des listing_id likés par l'utilisateur courant."""
     result = await db.execute(
         select(Like.listing_id).where(Like.user_id == USER_ID)
     )
     return list(result.scalars().all())
+
+
+@router.get("/likes/listings", response_model=list[ListingResponse])
+async def get_liked_listings_full(db: AsyncSession = Depends(get_db)):
+    """Retourne les annonces likées complètes avec leur vehicle."""
+    result = await db.execute(
+        select(Listing)
+        .join(Like, Like.listing_id == Listing.id)
+        .where(Like.user_id == USER_ID)
+        .options(selectinload(Listing.vehicle))
+        .order_by(Like.created_at.desc())
+    )
+    listings = list(result.scalars().all())
+    out = []
+    for listing in listings:
+        resp = ListingResponse.model_validate(listing)
+        if listing.vehicle:
+            resp.vehicle = VehicleResponse.model_validate(listing.vehicle)
+        resp.is_liked = True
+        out.append(resp)
+    return out

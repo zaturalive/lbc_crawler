@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Heart, ExternalLink, Car } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getSavedSearches, getLikedListings } from '../api/client';
+import { getSavedSearches, getLikedListings, removeLike } from '../api/client';
 import Header from '../components/Header';
 
 export default function Account() {
@@ -38,12 +39,23 @@ export default function Account() {
   async function fetchLikes() {
     setLoadingLikes(true);
     try {
-      const data = await getLikedListings(token);
+      const data = await getLikedListings();
       setLikes(Array.isArray(data) ? data : []);
     } catch (err) {
       // fail silently for likes
     } finally {
       setLoadingLikes(false);
+    }
+  }
+
+  async function handleUnlike(listingId) {
+    // Optimistic remove
+    setLikes(prev => prev.filter(l => l.id !== listingId));
+    try {
+      await removeLike(listingId);
+    } catch {
+      // revert on error
+      fetchLikes();
     }
   }
 
@@ -141,27 +153,63 @@ export default function Account() {
               ) : (
                 <ul className="space-y-3">
                   {likes.map((item, i) => (
-                    <li key={item.lbc_id || item.id || i} className="fmc-card p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-mono font-semibold text-fmc-text line-clamp-1">{item.title || 'Annonce'}</h3>
+                    <li key={item.id || i} className="fmc-card p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Main content — clickable → ouvre LBC */}
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 min-w-0 group block"
+                        >
+                          <h3 className="text-sm font-mono font-semibold text-fmc-text group-hover:text-fmc-accent transition-colors line-clamp-2">
+                            {item.title || 'Annonce sans titre'}
+                          </h3>
                           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs font-mono text-fmc-text-dim">
-                            {item.price && <span className="text-fmc-accent font-bold">{new Intl.NumberFormat('fr-FR').format(item.price)} €</span>}
-                            {item.year && <span>{item.year}</span>}
+                            {item.price   && <span className="text-fmc-accent font-bold">{new Intl.NumberFormat('fr-FR').format(item.price)} €</span>}
+                            {item.year    && <span>{item.year}</span>}
                             {item.mileage && <span>{new Intl.NumberFormat('fr-FR').format(item.mileage)} km</span>}
-                            {item.location && <span>{item.location}</span>}
+                            {item.horsepower && <span>{item.horsepower} ch</span>}
+                            {item.gearbox && <span>{item.gearbox === 'automatic' ? 'Auto' : 'Manuelle'}</span>}
+                            {item.fuel_type && <span>{item.fuel_type}</span>}
+                            {item.location && <span>📍 {item.location}</span>}
                           </div>
-                        </div>
-                        {item.url && (
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="fmc-btn-ghost text-xs px-3 py-1.5 whitespace-nowrap flex-shrink-0"
+                          {item.vehicle && (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <Car className="h-3 w-3 text-fmc-text-dim" />
+                              <span className="text-xs font-mono text-fmc-text-dim">
+                                {item.vehicle.brand} {item.vehicle.model}
+                                {item.vehicle.reliability_score != null && (
+                                  <span className="ml-2 text-green-400">⚡ {item.vehicle.reliability_score}/100</span>
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </a>
+
+                        {/* Actions */}
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          {/* Unlike button */}
+                          <button
+                            onClick={() => handleUnlike(item.id)}
+                            title="Retirer des favoris"
+                            className="p-1.5 rounded-md border border-red-500/70 text-red-400 bg-red-900/20 hover:bg-red-900/40 transition-colors"
                           >
-                            Voir
-                          </a>
-                        )}
+                            <Heart className="h-3.5 w-3.5 fill-current" />
+                          </button>
+                          {/* Lien LBC */}
+                          {item.url && (
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-md border border-fmc-accent-deep/50 text-fmc-text-dim hover:text-fmc-accent hover:border-fmc-accent/50 transition-colors"
+                              title="Voir l'annonce LBC"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </li>
                   ))}

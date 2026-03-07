@@ -9,12 +9,24 @@ from schemas import VehicleResponse
 router = APIRouter()
 
 
-@router.get("/vehicles", response_model=VehicleResponse)
-async def get_vehicle(brand: str, model: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Vehicle).where(Vehicle.brand == brand, Vehicle.model == model).limit(1)
-    )
-    vehicle = result.scalar_one_or_none()
-    if not vehicle:
+@router.get("/vehicles", response_model=list[VehicleResponse])
+async def list_vehicles(
+    brand: str | None = None,
+    model: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Sans paramètres : retourne tous les véhicules (max 500).
+    Avec brand + model : retourne le véhicule correspondant (liste d'un élément ou vide).
+    """
+    query = select(Vehicle)
+    if brand:
+        query = query.where(Vehicle.brand == brand)
+    if model:
+        query = query.where(Vehicle.model == model)
+    query = query.limit(500)
+    result = await db.execute(query)
+    vehicles = result.scalars().all()
+    if brand and model and not vehicles:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-    return VehicleResponse.model_validate(vehicle)
+    return [VehicleResponse.model_validate(v) for v in vehicles]

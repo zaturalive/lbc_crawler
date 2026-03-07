@@ -66,7 +66,7 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
             key={l.lbc_id || l.id}
             listing={l}
             onOpenModal={onOpenModal}
-            isLiked={likedIds.includes(l.lbc_id || l.id)}
+            isLiked={likedIds.includes(l.id)}
             onToggleLike={onToggleLike}
           />
         ))}

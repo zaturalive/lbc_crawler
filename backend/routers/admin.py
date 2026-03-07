@@ -76,6 +76,7 @@ async def store_vehicles(db: AsyncSession = Depends(get_db)):
                 common_issues=v.get("common_issues", []),
                 known_issues_text=v.get("known_issues_text", []),
                 source_url=v.get("source_url"),
+                reliability_rank=v.get("reliability_rank"),
             )
             .on_duplicate_key_update(
                 reliability_score=v.get("reliability_score"),
@@ -85,6 +86,7 @@ async def store_vehicles(db: AsyncSession = Depends(get_db)):
                 source_url=v.get("source_url"),
                 year_start=v.get("year_start"),
                 year_end=v.get("year_end"),
+                reliability_rank=v.get("reliability_rank"),
             )
         )
         await db.execute(stmt)
@@ -119,6 +121,7 @@ async def _poll_and_store(db: AsyncSession):
                             common_issues=v.get("common_issues", []),
                             known_issues_text=v.get("known_issues_text", []),
                             source_url=v.get("source_url"),
+                            reliability_rank=v.get("reliability_rank"),
                         )
                         .on_duplicate_key_update(
                             reliability_score=v.get("reliability_score"),
@@ -126,6 +129,7 @@ async def _poll_and_store(db: AsyncSession):
                             common_issues=v.get("common_issues", []),
                             known_issues_text=v.get("known_issues_text", []),
                             source_url=v.get("source_url"),
+                            reliability_rank=v.get("reliability_rank"),
                         )
                     )
                     await db.execute(stmt)

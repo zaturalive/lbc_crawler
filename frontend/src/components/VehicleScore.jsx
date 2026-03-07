@@ -3,22 +3,22 @@ import { clsx } from 'clsx';
 
 const scoreVariant = (score) => {
   if (score === null || score === undefined) return 'default';
-  if (score >= 8) return 'success';
-  if (score >= 5) return 'warning';
+  if (score >= 80) return 'success';
+  if (score >= 50) return 'warning';
   return 'danger';
 };
 
 const scoreBorderClass = (score) => {
   if (score === null || score === undefined) return 'border-fmc-border';
-  if (score >= 8) return 'border-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]';
-  if (score >= 5) return 'border-yellow-500';
+  if (score >= 80) return 'border-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]';
+  if (score >= 50) return 'border-yellow-500';
   return 'border-red-500';
 };
 
 const scoreTextClass = (score) => {
   if (score === null || score === undefined) return 'text-fmc-text-muted';
-  if (score >= 8) return 'text-fmc-success';
-  if (score >= 5) return 'text-fmc-warning';
+  if (score >= 80) return 'text-fmc-success';
+  if (score >= 50) return 'text-fmc-warning';
   return 'text-fmc-danger';
 };
 
@@ -36,7 +36,7 @@ function parseIssue(issue) {
 export default function VehicleScore({ vehicle }) {
   if (!vehicle) return null;
 
-  const { reliability_score, common_issues } = vehicle;
+  const { reliability_score, common_issues, total_testimonials } = vehicle;
   const hasScore = reliability_score !== null && reliability_score !== undefined;
 
   return (
@@ -47,10 +47,13 @@ export default function VehicleScore({ vehicle }) {
           scoreBorderClass(reliability_score),
           scoreTextClass(reliability_score),
         )}>
-          {hasScore ? reliability_score : '–'}
+          {hasScore ? (reliability_score / 10).toFixed(1) : '–'}
         </div>
         <span className="text-fmc-text-dim text-xs leading-tight">
-          {hasScore ? `${reliability_score}/10 fiabilité` : 'N/A'}
+          {hasScore
+            ? `${(reliability_score / 10).toFixed(1)}/10 fiabilité${total_testimonials ? ` · ${total_testimonials.toLocaleString('fr-FR')} tém.` : ''}`
+            : 'N/A'
+          }
         </span>
       </div>
       {common_issues && common_issues.length > 0 ? (
