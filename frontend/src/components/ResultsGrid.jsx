@@ -7,6 +7,7 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
   const [filteredListings, setFilteredListings] = useState([]);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [cols, setCols] = useState(3);
 
   // Réinitialise les listings filtrés à chaque nouvelle recherche
   useEffect(() => {
@@ -73,11 +74,29 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
             — {listingsWithScore} avec score fiabilité
           </span>
         )}
+        {/* Toggle colonnes */}
+        <div className="flex items-center gap-1 ml-auto border border-fmc-accent-deep/40 rounded overflow-hidden">
+          {[2, 3].map(n => (
+            <button
+              key={n}
+              onClick={() => setCols(n)}
+              title={`${n} colonnes`}
+              className={`px-2 py-1 font-mono text-xs transition-colors duration-150 ${
+                cols === n
+                  ? 'bg-fmc-accent-deep text-white'
+                  : 'text-fmc-text-dim hover:text-fmc-text hover:bg-fmc-surface'
+              }`}
+            >
+              {'▪'.repeat(n)}
+            </button>
+          ))}
+        </div>
+
         {searchHistoryId && !aiAnalysis && (
           <button
             onClick={handleAiAnalyze}
             disabled={aiLoading}
-            className={`ml-auto flex items-center gap-2 px-3 py-1 rounded font-mono text-xs transition-all duration-300 ${
+            className={`flex items-center gap-2 px-3 py-1 rounded font-mono text-xs transition-all duration-300 ${
               aiLoading
                 ? 'bg-purple-900/50 text-purple-300 border border-purple-500/50 animate-pulse cursor-wait'
                 : 'bg-gradient-to-r from-purple-900/40 to-cyan-900/40 text-purple-300 border border-purple-500/40 hover:border-purple-400/70 hover:text-purple-200'
@@ -147,7 +166,7 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
       <ListingsFilterBar listings={listings} onFiltered={setFilteredListings} />
 
       {/* Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 p-1">
+      <div className={`grid grid-cols-1 gap-4 p-1 ${cols === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
         {filteredListings.map(l => (
           <ListingCard
             key={l.lbc_id || l.id}
