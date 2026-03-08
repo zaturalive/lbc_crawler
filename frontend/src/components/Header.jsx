@@ -47,8 +47,8 @@ export default function Header() {
           )}
           {user ? (
             <>
-              {/* Solde crédits */}
-              {credits && (
+              {/* Solde crédits — badge cliquable ou lien texte fallback */}
+              {credits ? (
                 <Link
                   to="/credits"
                   className="hidden sm:flex items-center gap-2 text-xs font-mono bg-fmc-bg border border-fmc-accent-deep/40 rounded px-2 py-1 hover:border-fmc-accent/60 transition-colors"
@@ -63,6 +63,13 @@ export default function Header() {
                     <Search size={11} />
                     {credits.daily_searches_free_remaining + credits.search_credits}
                   </span>
+                </Link>
+              ) : (
+                <Link
+                  to="/credits"
+                  className="text-xs font-mono text-fmc-text-dim hover:text-fmc-accent transition-colors"
+                >
+                  Crédits
                 </Link>
               )}
               <span className="text-xs font-mono text-fmc-text-dim hidden sm:block max-w-[140px] truncate">
