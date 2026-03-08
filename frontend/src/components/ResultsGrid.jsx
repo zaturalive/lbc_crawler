@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ListingCard from './ListingCard';
 import ListingsFilterBar from './ListingsFilterBar';
 import { analyzeListingAI, getCachedAnalyses, getAiQuota } from '../api/client';
 
 export default function ResultsGrid({ results, loading, onOpenModal, likedIds = [], onToggleLike, aiMode = false, onAiAnalyze, searchHistoryId = null, token = null, onClearSearch = null, viewedIds = new Set() }) {
+  const navigate = useNavigate();
   const [filteredListings, setFilteredListings] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
@@ -80,6 +82,10 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
         setCardAnalyses(prev => ({ ...prev, [listing.id]: result }));
         if (!result?.cached) newCount++;
       } catch (err) {
+        if (err?.status === 402) {
+          navigate('/credits');
+          break;
+        }
         if (err?.status === 429) {
           setAiError(err?.message || 'Quota IA dépassé (10/10)');
           break;

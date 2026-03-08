@@ -42,6 +42,12 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - SCRAPER_URL=http://scraper:8001
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_MODEL=${GITHUB_MODEL:-gpt-4o-mini}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
     depends_on:
       mariadb:
         condition: service_healthy

@@ -10,16 +10,22 @@ async function request(method, path, body, token) {
   const res = await fetch(`${API_BASE}${path}`, opts);
   if (!res.ok) {
     let msg = `Erreur ${res.status}`;
-    try { msg = (await res.json()).detail || msg; } catch (_) {}
+    let detail = null;
+    try {
+      detail = (await res.json()).detail;
+      if (typeof detail === 'string') msg = detail;
+      else if (detail?.message) msg = detail.message;
+    } catch (_) {}
     const err = new Error(msg);
     err.status = res.status;
+    err.detail = detail;
     throw err;
   }
   if (res.status === 204) return null;
   return res.json();
 }
 
-export const searchListings = (params) => request('POST', '/search', params);
+export const searchListings = (params, token) => request('POST', '/search', params, token);
 export const getPatterns = () => request('GET', '/patterns');
 export const createPattern = (data) => request('POST', '/patterns', data);
 export const deletePattern = (id) => request('DELETE', `/patterns/${id}`);
@@ -50,3 +56,8 @@ export const getViewedListings  = ()    => request('GET',    '/history/listings'
 export const markListingViewed  = (id)  => request('POST',   `/history/listings/${id}`);
 export const clearSearchHistory = ()    => request('DELETE', '/history/searches');
 export const clearViewedHistory = ()    => request('DELETE', '/history/listings');
+
+// ─── Crédits & Paiements ──────────────────────────────────────────────────────
+export const getMyCredits  = (token)          => request('GET',  '/credits/me', undefined, token);
+export const getCreditPacks = ()               => request('GET',  '/payments/packs');
+export const createCheckout = (pack_id, token) => request('POST', '/payments/create-checkout', { pack_id }, token);

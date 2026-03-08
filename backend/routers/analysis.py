@@ -13,11 +13,13 @@ from services.ai_service import (
     build_search_prompt, call_github_models_search,
     scan_immat_vision,
 )
+from services.credits_service import check_analysis_available, consume_analysis_credit
 
 router = APIRouter(tags=["analysis"])
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
+# Conservés pour rétrocompatibilité /ai/quota mais plus utilisés comme contrôle
 QUOTA_LISTING_MAX = 10
 QUOTA_SEARCH_MAX = 3
 
@@ -121,16 +123,16 @@ async def analyze_search(
 ):
     current_user_id = _extract_user_id(credentials)
 
-    # Quota check
-    quota_result = await db.execute(
-        select(func.count()).select_from(AnalyseRecherche)
-        .where(AnalyseRecherche.user_id == current_user_id)
-    )
-    quota_used = quota_result.scalar() or 0
-    if quota_used >= QUOTA_SEARCH_MAX:
+    # Vérification crédits analyse
+    credit_check = await check_analysis_available(current_user_id, db)
+    if not credit_check["ok"]:
         raise HTTPException(
-            status_code=429,
-            detail="Quota atteint : 3 analyses globales maximum.",
+            status_code=402,
+            detail={
+                "code": "no_analysis_credits",
+                "message": "Crédits d'analyse insuffisants. Achetez un pack pour continuer.",
+                "balance": credit_check["balance"],
+            },
         )
 
     # Cache check
@@ -217,6 +219,9 @@ async def analyze_search(
     await db.commit()
     await db.refresh(analyse)
 
+    # Consommer 1 crédit d'analyse
+    await consume_analysis_credit(current_user_id, db)
+
     return AnalyseRechercheOut.model_validate(analyse)
 
 
@@ -285,16 +290,16 @@ async def analyze_listing(
             out.cached = True
             return out
 
-    # ÉTAPE 2 — Vérifier le quota de cet user
-    quota_result = await db.execute(
-        select(func.count()).select_from(ListingAnalysisUser)
-        .where(ListingAnalysisUser.user_id == current_user_id)
-    )
-    quota_used = quota_result.scalar() or 0
-    if quota_used >= QUOTA_LISTING_MAX:
+    # ÉTAPE 2 — Vérifier les crédits d'analyse
+    credit_check = await check_analysis_available(current_user_id, db)
+    if not credit_check["ok"]:
         raise HTTPException(
-            status_code=429,
-            detail=f"Quota atteint : {QUOTA_LISTING_MAX} analyses maximum. Votre quota sera réinitialisé prochainement.",
+            status_code=402,
+            detail={
+                "code": "no_analysis_credits",
+                "message": "Crédits d'analyse insuffisants. Achetez un pack pour continuer.",
+                "balance": credit_check["balance"],
+            },
         )
 
     # ÉTAPE 3 — Une analyse globale existe déjà pour ce listing (autre user) ?
@@ -313,6 +318,7 @@ async def analyze_listing(
             user_id=current_user_id,
             used_cache=True,
         ))
+        await consume_analysis_credit(current_user_id, db)
         await db.commit()
         out = RequeteIAOut.model_validate(global_cached)
         out.is_premium = False
@@ -396,6 +402,8 @@ async def analyze_listing(
         user_id=current_user_id,
         used_cache=False,
     ))
+    # Déduire 1 crédit d'analyse du solde
+    await consume_analysis_credit(current_user_id, db)
     await db.commit()
     await db.refresh(requete)
 

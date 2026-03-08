@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import NumberInput from './ui/NumberInput';
@@ -60,6 +62,8 @@ function loadPresets() {
 }
 
 export default function SearchForm({ onResults, onLoading, initialValues = null, autoSubmit = false }) {
+  const { token } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -141,9 +145,18 @@ export default function SearchForm({ onResults, onLoading, initialValues = null,
         sort_by: (form.sort_by && form.sort_by !== '__any__') ? form.sort_by : null,
         condition: (form.condition && form.condition !== '__any__') ? form.condition : null,
       };
-      const result = await searchListings(payload);
+      const result = await searchListings(payload, token);
       onResults(result);
     } catch (err) {
+      if (err.status === 402) {
+        navigate('/credits');
+        return;
+      }
+      if (err.status === 429) {
+        setError('Limite de 300 résultats journaliers atteinte. Revenez demain.');
+        onResults(null);
+        return;
+      }
       setError(err.message || 'Une erreur est survenue. Réessayez.');
       onResults(null);
     } finally {

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -201,3 +201,59 @@ class ReponseRechercheIA(Base):
     created_at             = Column(DateTime, default=func.now())
 
     analyse = relationship("AnalyseRecherche", back_populates="reponse")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Système de crédits & paiements
+# ─────────────────────────────────────────────────────────────────────────────
+
+PACK_TYPES = ("search", "analysis")
+
+class CreditPack(Base):
+    """Packs de crédits achetables (configurés en DB ou en code)."""
+    __tablename__ = "credit_packs"
+
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    name        = Column(String(100), nullable=False)
+    pack_type   = Column(Enum(*PACK_TYPES, name="pack_type_enum"), nullable=False)
+    credits     = Column(Integer, nullable=False)
+    price_cents = Column(Integer, nullable=False)  # prix en centimes EUR
+    active      = Column(Boolean, default=True)
+
+    transactions = relationship("CreditTransaction", back_populates="pack")
+
+
+class UserCredits(Base):
+    """Solde de crédits par utilisateur + compteurs quotidiens."""
+    __tablename__ = "user_credits"
+
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    user_id             = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    search_credits      = Column(Integer, default=0, nullable=False)
+    analysis_credits    = Column(Integer, default=0, nullable=False)
+    daily_searches_used = Column(Integer, default=0, nullable=False)
+    daily_results_used  = Column(Integer, default=0, nullable=False)
+    daily_reset_date    = Column(Date, nullable=True)
+
+    user = relationship("User", backref="credits")
+
+    __table_args__ = (Index("idx_uc_user", "user_id"),)
+
+
+class CreditTransaction(Base):
+    """Historique des achats de crédits."""
+    __tablename__ = "credit_transactions"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    user_id          = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    pack_id          = Column(Integer, ForeignKey("credit_packs.id", ondelete="SET NULL"), nullable=True)
+    credits_added    = Column(Integer, nullable=False)
+    pack_type        = Column(Enum(*PACK_TYPES, name="pack_type_enum"), nullable=False)
+    stripe_session_id = Column(String(200), nullable=True, unique=True)
+    stripe_payment_id = Column(String(200), nullable=True)
+    status           = Column(String(20), default="pending")  # pending | completed | failed
+    created_at       = Column(DateTime, default=func.now())
+
+    pack = relationship("CreditPack", back_populates="transactions")
+
+    __table_args__ = (Index("idx_ct_user", "user_id"),)
