@@ -1,5 +1,12 @@
 # IA — Authentification et Quota Journalier
 
+## Environnement de production
+
+- **URL** : `https://fmc.home-doudou.com`
+- **API base** : `https://fmc.home-doudou.com/api`
+- **Hébergement** : Raspberry Pi (self-hosted), Traefik reverse proxy
+
+---
 ## Vue d'ensemble
 
 Toutes les requêtes vers les endpoints d'analyse IA nécessitent une authentification.
