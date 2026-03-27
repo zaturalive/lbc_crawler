@@ -1,41 +1,28 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from core.security import decode_token
 from db.database import get_db
-from models import Listing, ListingAnalysisUser, RequeteIA, ReponseIA, AnalyseRecherche, ReponseRechercheIA, SearchHistory, Vehicle
+from models import Listing, ListingAnalysisUser, RequeteIA, ReponseIA, AnalyseRecherche, ReponseRechercheIA, SearchHistory, Vehicle, UserCredits, User
 from schemas import RequeteIAOut, AnalyseRechercheOut
 from services.ai_service import (
     build_prompt, call_github_models, GITHUB_MODEL,
     build_search_prompt, call_github_models_search,
     scan_immat_vision,
 )
-from services.credits_service import check_analysis_available, consume_analysis_credit
+from services.credits_service import (
+    check_analysis_available, consume_analysis_credit,
+    check_daily_ai_quota, consume_daily_ai_request,
+    DAILY_AI_REQUESTS_MAX,
+)
+from core.deps import get_current_user
 
 router = APIRouter(tags=["analysis"])
-
-_bearer_scheme = HTTPBearer(auto_error=False)
 
 # Conservés pour rétrocompatibilité /ai/quota mais plus utilisés comme contrôle
 QUOTA_LISTING_MAX = 10
 QUOTA_SEARCH_MAX = 3
-
-
-def _extract_user_id(credentials) -> int:
-    """Extract user_id from optional Bearer token. Falls back to 1 if absent or invalid."""
-    if not credentials:
-        return 1
-    payload = decode_token(credentials.credentials)
-    if payload is None:
-        return 1
-    sub = payload.get("sub")
-    try:
-        return int(sub)
-    except (TypeError, ValueError):
-        return 1
 
 
 # --- Bulk cache fetch — retourne uniquement les analyses déjà payées par cet user -----
@@ -43,7 +30,7 @@ def _extract_user_id(credentials) -> int:
 @router.get("/ai/analyses")
 async def get_cached_analyses(
     listing_ids: str = Query(..., description="Comma-separated listing IDs, e.g. 1,2,3"),
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Return analyses already paid for by this user (in listing_analysis_users)."""
@@ -55,7 +42,7 @@ async def get_cached_analyses(
     if not ids:
         return {}
 
-    current_user_id = _extract_user_id(credentials)
+    current_user_id = current_user.id
 
     # Trouver quels listing_ids cet user a déjà "payés"
     owned_result = await db.execute(
@@ -90,10 +77,10 @@ async def get_cached_analyses(
 
 @router.get("/ai/quota")
 async def get_quota(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    current_user_id = _extract_user_id(credentials)
+    current_user_id = current_user.id
 
     # Quota listing = nombre d'entrées dans listing_analysis_users pour cet user
     listing_count_result = await db.execute(
@@ -108,20 +95,45 @@ async def get_quota(
     )
     search_used = search_count_result.scalar() or 0
 
+    # Max dynamique = analyses déjà faites + crédits restants
+    credits_result = await db.execute(
+        select(UserCredits).where(UserCredits.user_id == current_user_id)
+    )
+    credits = credits_result.scalar_one_or_none()
+    remaining_credits = credits.analysis_credits if credits else 0
+    listing_max = listing_used + remaining_credits
+
     return {
         "listing_analyses_used": listing_used,
-        "listing_analyses_max": QUOTA_LISTING_MAX,
+        "listing_analyses_max": max(listing_max, listing_used),
         "search_analyses_used": search_used,
         "search_analyses_max": QUOTA_SEARCH_MAX,
+        "analysis_credits_remaining": remaining_credits,
+        "daily_ai_requests_used": credits.daily_ai_requests_used if credits else 0,
+        "daily_ai_requests_max": DAILY_AI_REQUESTS_MAX,
+        "daily_ai_requests_remaining": max(0, DAILY_AI_REQUESTS_MAX - (credits.daily_ai_requests_used if credits else 0)),
     }
 
 @router.post("/search/{search_id}/analyze", response_model=AnalyseRechercheOut)
 async def analyze_search(
     search_id: int,
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    current_user_id = _extract_user_id(credentials)
+    current_user_id = current_user.id
+
+    # Vérification quota journalier IA
+    quota_check = await check_daily_ai_quota(current_user_id, db)
+    if not quota_check["ok"]:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "daily_ai_quota_exceeded",
+                "message": f"Quota journalier atteint ({quota_check['max']} requêtes/jour). Revenez demain.",
+                "used": quota_check["used"],
+                "max": quota_check["max"],
+            },
+        )
 
     # Vérification crédits analyse
     credit_check = await check_analysis_available(current_user_id, db)
@@ -143,6 +155,8 @@ async def analyze_search(
     )
     cached = result.scalar_one_or_none()
     if cached:
+        await consume_analysis_credit(current_user_id, db)
+        await consume_daily_ai_request(current_user_id, db)
         return AnalyseRechercheOut.model_validate(cached)
 
     # Fetch search history
@@ -219,8 +233,9 @@ async def analyze_search(
     await db.commit()
     await db.refresh(analyse)
 
-    # Consommer 1 crédit d'analyse
+    # Consommer 1 crédit d'analyse + 1 quota journalier
     await consume_analysis_credit(current_user_id, db)
+    await consume_daily_ai_request(current_user_id, db)
 
     return AnalyseRechercheOut.model_validate(analyse)
 
@@ -240,7 +255,11 @@ async def get_search_analysis(search_id: int, db: AsyncSession = Depends(get_db)
 # --- Scan immatriculation par annonce -------------------------------------------
 
 @router.post("/listings/{listing_id}/scan-immat")
-async def scan_immat(listing_id: int, db: AsyncSession = Depends(get_db)):
+async def scan_immat(
+    listing_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Listing).where(Listing.id == listing_id))
     listing = result.scalar_one_or_none()
     if not listing:
@@ -263,12 +282,12 @@ async def scan_immat(listing_id: int, db: AsyncSession = Depends(get_db)):
 @router.post("/listings/{listing_id}/analyze", response_model=RequeteIAOut)
 async def analyze_listing(
     listing_id: int,
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    current_user_id = _extract_user_id(credentials)
+    current_user_id = current_user.id
 
-    # ÉTAPE 1 — Cet user a-t-il déjà payé pour cette annonce ?
+    # ÉTAPE 1 — Cet user a-t-il déjà payé pour cette annonce ? (pas de quota consommé)
     owned_result = await db.execute(
         select(ListingAnalysisUser)
         .where(ListingAnalysisUser.user_id == current_user_id)
@@ -276,7 +295,6 @@ async def analyze_listing(
     )
     already_owned = owned_result.scalar_one_or_none()
     if already_owned:
-        # Gratuit — retourne le cache sans consommer de crédit
         cached_result = await db.execute(
             select(RequeteIA)
             .options(selectinload(RequeteIA.reponse))
@@ -290,7 +308,20 @@ async def analyze_listing(
             out.cached = True
             return out
 
-    # ÉTAPE 2 — Vérifier les crédits d'analyse
+    # ÉTAPE 2 — Vérifier le quota journalier IA
+    quota_check = await check_daily_ai_quota(current_user_id, db)
+    if not quota_check["ok"]:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "daily_ai_quota_exceeded",
+                "message": f"Quota journalier atteint ({quota_check['max']} requêtes/jour). Revenez demain.",
+                "used": quota_check["used"],
+                "max": quota_check["max"],
+            },
+        )
+
+    # ÉTAPE 3 — Vérifier les crédits d'analyse
     credit_check = await check_analysis_available(current_user_id, db)
     if not credit_check["ok"]:
         raise HTTPException(
@@ -302,7 +333,7 @@ async def analyze_listing(
             },
         )
 
-    # ÉTAPE 3 — Une analyse globale existe déjà pour ce listing (autre user) ?
+    # ÉTAPE 4 — Une analyse globale existe déjà pour ce listing (autre user) ?
     global_cached_result = await db.execute(
         select(RequeteIA)
         .options(selectinload(RequeteIA.reponse))
@@ -312,20 +343,21 @@ async def analyze_listing(
     global_cached = global_cached_result.scalar_one_or_none()
 
     if global_cached and global_cached.reponse:
-        # Cache global disponible — consomme 1 crédit, ZÉRO appel API
+        # Cache global disponible — consomme 1 crédit + 1 quota, ZÉRO appel API
         db.add(ListingAnalysisUser(
             listing_id=listing_id,
             user_id=current_user_id,
             used_cache=True,
         ))
         await consume_analysis_credit(current_user_id, db)
+        await consume_daily_ai_request(current_user_id, db)
         await db.commit()
         out = RequeteIAOut.model_validate(global_cached)
         out.is_premium = False
         out.cached = True
         return out
 
-    # ÉTAPE 4 — Pas de cache : appel IA réel
+    # ÉTAPE 5 — Pas de cache : appel IA réel
     result = await db.execute(select(Listing).where(Listing.id == listing_id))
     listing = result.scalar_one_or_none()
     if not listing:
@@ -402,8 +434,9 @@ async def analyze_listing(
         user_id=current_user_id,
         used_cache=False,
     ))
-    # Déduire 1 crédit d'analyse du solde
+    # Déduire 1 crédit d'analyse + 1 quota journalier
     await consume_analysis_credit(current_user_id, db)
+    await consume_daily_ai_request(current_user_id, db)
     await db.commit()
     await db.refresh(requete)
 

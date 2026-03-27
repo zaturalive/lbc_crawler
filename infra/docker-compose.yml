@@ -48,6 +48,7 @@ services:
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - DAILY_AI_REQUESTS_MAX=${DAILY_AI_REQUESTS_MAX:-5}
     depends_on:
       mariadb:
         condition: service_healthy

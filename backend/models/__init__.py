@@ -230,10 +230,11 @@ class UserCredits(Base):
     id                  = Column(Integer, primary_key=True, autoincrement=True)
     user_id             = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
     search_credits      = Column(Integer, default=0, nullable=False)
-    analysis_credits    = Column(Integer, default=0, nullable=False)
-    daily_searches_used = Column(Integer, default=0, nullable=False)
-    daily_results_used  = Column(Integer, default=0, nullable=False)
-    daily_reset_date    = Column(Date, nullable=True)
+    analysis_credits    = Column(Integer, default=5, nullable=False)
+    daily_searches_used    = Column(Integer, default=0, nullable=False)
+    daily_results_used     = Column(Integer, default=0, nullable=False)
+    daily_ai_requests_used = Column(Integer, default=0, nullable=False)
+    daily_reset_date       = Column(Date, nullable=True)
 
     user = relationship("User", backref="credits")
 
