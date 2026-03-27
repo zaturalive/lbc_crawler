@@ -14,6 +14,7 @@ from services.ai_service import (
 from services.credits_service import (
     check_analysis_available, consume_analysis_credit,
     check_daily_ai_quota, consume_daily_ai_request,
+    get_or_create_user_credits,
     DAILY_AI_REQUESTS_MAX,
 )
 from core.deps import get_current_user
@@ -82,6 +83,11 @@ async def get_quota(
 ):
     current_user_id = current_user.id
 
+    # Déclenche le reset quotidien + top-up crédits si nouveau jour
+    credits = await get_or_create_user_credits(current_user_id, db)
+    from services.credits_service import _reset_daily_if_needed
+    credits = await _reset_daily_if_needed(credits, db)
+
     # Quota listing = nombre d'entrées dans listing_analysis_users pour cet user
     listing_count_result = await db.execute(
         select(func.count()).select_from(ListingAnalysisUser)
@@ -95,12 +101,7 @@ async def get_quota(
     )
     search_used = search_count_result.scalar() or 0
 
-    # Max dynamique = analyses déjà faites + crédits restants
-    credits_result = await db.execute(
-        select(UserCredits).where(UserCredits.user_id == current_user_id)
-    )
-    credits = credits_result.scalar_one_or_none()
-    remaining_credits = credits.analysis_credits if credits else 0
+    remaining_credits = credits.analysis_credits
     listing_max = listing_used + remaining_credits
 
     return {
@@ -109,9 +110,10 @@ async def get_quota(
         "search_analyses_used": search_used,
         "search_analyses_max": QUOTA_SEARCH_MAX,
         "analysis_credits_remaining": remaining_credits,
-        "daily_ai_requests_used": credits.daily_ai_requests_used if credits else 0,
+        "search_credits": credits.search_credits,
+        "daily_ai_requests_used": credits.daily_ai_requests_used,
         "daily_ai_requests_max": DAILY_AI_REQUESTS_MAX,
-        "daily_ai_requests_remaining": max(0, DAILY_AI_REQUESTS_MAX - (credits.daily_ai_requests_used if credits else 0)),
+        "daily_ai_requests_remaining": max(0, DAILY_AI_REQUESTS_MAX - credits.daily_ai_requests_used),
     }
 
 @router.post("/search/{search_id}/analyze", response_model=AnalyseRechercheOut)

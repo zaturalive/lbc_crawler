@@ -20,6 +20,11 @@ DAILY_FREE_SEARCHES = 3
 DAILY_RESULTS_LIMIT = 300
 DAILY_AI_REQUESTS_MAX = int(os.getenv("DAILY_AI_REQUESTS_MAX", "5"))
 
+# Top-up journalier
+DAILY_AI_CREDITS_CAP    = int(os.getenv("DAILY_AI_CREDITS_CAP", "10"))   # seuil/plafond IA
+DAILY_SEARCH_TOPUP      = int(os.getenv("DAILY_SEARCH_TOPUP", "3"))       # crédits recherche ajoutés/jour
+DAILY_SEARCH_CREDITS_CAP = int(os.getenv("DAILY_SEARCH_CREDITS_CAP", "5")) # plafond crédits recherche
+
 _raw_admin_ids = os.getenv("ADMIN_USER_IDS", "1")
 ADMIN_USER_IDS: set[int] = {int(x.strip()) for x in _raw_admin_ids.split(",") if x.strip().isdigit()}
 
@@ -39,13 +44,21 @@ async def get_or_create_user_credits(user_id: int, db: AsyncSession) -> UserCred
 
 
 async def _reset_daily_if_needed(credits: UserCredits, db: AsyncSession) -> UserCredits:
-    """Remet à zéro les compteurs quotidiens si le jour a changé (UTC)."""
+    """Remet à zéro les compteurs quotidiens si le jour a changé (UTC).
+    Applique aussi le top-up journalier :
+    - Crédits IA  : complétés à DAILY_AI_CREDITS_CAP si en dessous (jamais réduits)
+    - Crédits recherche : +DAILY_SEARCH_TOPUP par jour, plafonné à DAILY_SEARCH_CREDITS_CAP
+    """
     today = datetime.now(timezone.utc).date()
     if credits.daily_reset_date is None or credits.daily_reset_date < today:
         credits.daily_searches_used = 0
         credits.daily_results_used = 0
         credits.daily_ai_requests_used = 0
         credits.daily_reset_date = today
+        # Top-up IA : on amène à 10 ceux qui sont en dessous, on ne touche pas ceux au-dessus
+        credits.analysis_credits = max(credits.analysis_credits, DAILY_AI_CREDITS_CAP)
+        # Top-up recherche : +3/jour plafonné à 5
+        credits.search_credits = min(credits.search_credits + DAILY_SEARCH_TOPUP, DAILY_SEARCH_CREDITS_CAP)
         await db.commit()
         await db.refresh(credits)
     return credits
@@ -219,5 +232,8 @@ async def get_credits_summary(user_id: int, db: AsyncSession) -> dict:
         "daily_ai_requests_used": credits.daily_ai_requests_used,
         "daily_ai_requests_max": DAILY_AI_REQUESTS_MAX,
         "daily_ai_requests_remaining": max(0, DAILY_AI_REQUESTS_MAX - credits.daily_ai_requests_used),
+        "daily_ai_credits_cap": DAILY_AI_CREDITS_CAP,
+        "daily_search_topup": DAILY_SEARCH_TOPUP,
+        "daily_search_credits_cap": DAILY_SEARCH_CREDITS_CAP,
         "resets_at": str(today),
     }
