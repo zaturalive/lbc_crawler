@@ -2,9 +2,9 @@
 
 ## Environnement de production
 
-- **URL** : `https://fmc.home-doudou.com`
-- **API base** : `https://fmc.home-doudou.com/api`
-- **Hébergement** : Raspberry Pi (self-hosted), Traefik reverse proxy
+- **URL** : `https://findmycar.home-doudou.com`
+- **API base** : `https://findmycar.home-doudou.com/api`
+- **Hébergement** : Raspberry Pi (self-hosted, 192.168.1.183), nginx reverse proxy, Cloudflare Tunnel (`pi5-maison`)
 
 ---
 ## Vue d'ensemble
@@ -120,9 +120,42 @@ HTTP 402 Payment Required
 }
 ```
 
+## Top-up journalier de crédits
+
+### Mécanisme : lazy evaluation (pas de cron)
+
+Il n'y a **pas de tâche cron**. Le top-up est déclenché automatiquement à la **première requête authentifiée du jour** pour chaque utilisateur, via la fonction `_reset_daily_if_needed()` dans `credits_service.py`.
+
+```
+À chaque appel API authentifié →
+  si credits.daily_reset_date < aujourd'hui (UTC) :
+    → reset des compteurs journaliers (searches_used, ai_requests_used)
+    → top-up IA   : analysis_credits = max(solde_actuel, DAILY_AI_CREDITS_CAP)
+    → top-up search : search_credits = min(solde_actuel + DAILY_SEARCH_TOPUP, DAILY_SEARCH_CREDITS_CAP)
+    → daily_reset_date = aujourd'hui
+```
+
+**Avantage** : zéro infrastructure supplémentaire — fonctionne même si le serveur est éteint la nuit.  
+**Note** : un utilisateur qui ne se connecte jamais ne reçoit pas de top-up, mais ses crédits existants ne sont pas perdus.
+
+### Règles
+
+| Type | Règle | Exemple |
+|------|-------|---------|
+| **Crédits IA** | Complétés à 10 si en dessous — jamais réduits au-dessus | 9 → 10 / 15 → 15 |
+| **Crédits recherche** | +3/jour, plafonné à 5 | 2 → 5 / 4 → 5 |
+
+### Variables d'environnement
+
+```
+DAILY_AI_CREDITS_CAP=10      # seuil/plafond crédits IA (défaut: 10)
+DAILY_SEARCH_TOPUP=3         # crédits recherche ajoutés par jour (défaut: 3)
+DAILY_SEARCH_CREDITS_CAP=5   # plafond crédits recherche (défaut: 5)
+```
+
 ---
 
-## Endpoint quota utilisateur
+
 
 `GET /ai/quota` — retourne le quota complet de l'utilisateur connecté.
 
@@ -132,7 +165,8 @@ HTTP 402 Payment Required
   "listing_analyses_max": 8,
   "search_analyses_used": 1,
   "search_analyses_max": 3,
-  "analysis_credits_remaining": 5,
+  "analysis_credits_remaining": 10,
+  "search_credits": 4,
   "daily_ai_requests_used": 2,
   "daily_ai_requests_max": 5,
   "daily_ai_requests_remaining": 3
