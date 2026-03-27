@@ -1,5 +1,20 @@
 services:
 
+  traefik:
+    image: traefik:v3.0
+    container_name: fmc-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=false"
+
   frontend:
     image: ${REGISTRY_URL}/fmc-frontend:${TAG:-latest}
     container_name: fmc-frontend
@@ -9,12 +24,11 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-find-my-car.local}`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
 
   backend:
     image: ${REGISTRY_URL}/fmc-backend:${TAG:-latest}
@@ -28,14 +42,8 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - SCRAPER_URL=http://scraper:8001
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
-      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GITHUB_MODEL=${GITHUB_MODEL:-gpt-4o-mini}
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
-      - FRONTEND_URL=${FRONTEND_URL:-https://fmc.home-doudou.com}
-      - DAILY_AI_REQUESTS_MAX=${DAILY_AI_REQUESTS_MAX:-5}
-      - ADMIN_USER_IDS=${ADMIN_USER_IDS:-1}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -45,6 +53,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-find-my-car.local}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=web"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      - "traefik.http.routers.backend.middlewares=api-stripprefix"
+      - "traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api"
     networks:
       - proxy
       - internal

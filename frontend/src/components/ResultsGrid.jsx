@@ -10,6 +10,7 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [aiQuota, setAiQuota] = useState(null);
+  const hotPickId = results?.hot_pick_id ?? null;
   const [cols, setCols] = useState(3);
   const [batchProgress, setBatchProgress] = useState(null);
   const [cardAnalyses, setCardAnalyses] = useState({});
@@ -87,7 +88,7 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
           break;
         }
         if (err?.status === 429) {
-          setAiError(err?.message || 'Quota IA dépassé (10/10)');
+          setAiError(err?.message || 'Plus de crédits IA disponibles');
           break;
         }
         // autres erreurs: skip silencieusement
@@ -178,21 +179,22 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
         </div>
 
         {(() => {
-          const quotaReached = aiQuota && aiQuota.listing_analyses_used >= aiQuota.listing_analyses_max;
+          const creditsLeft = aiQuota?.analysis_credits_remaining ?? null;
+          const noCredits = creditsLeft !== null && creditsLeft <= 0;
           return (
             <div className="flex flex-col items-end gap-0.5">
               <button
                 onClick={(e) => handleAiAnalyze(e)}
-                disabled={aiLoading || quotaReached}
+                disabled={aiLoading || noCredits}
                 className={`flex items-center gap-2 px-3 py-1 rounded font-mono text-xs transition-all duration-300 ${
-                  quotaReached
+                  noCredits
                     ? 'bg-zinc-800/60 text-zinc-500 border border-zinc-600/40 cursor-not-allowed'
                     : aiLoading
                       ? 'bg-purple-900/50 text-purple-300 border border-purple-500/50 animate-pulse cursor-wait'
                       : 'bg-gradient-to-r from-purple-900/40 to-cyan-900/40 text-purple-300 border border-purple-500/40 hover:border-purple-400/70 hover:text-purple-200'
                 }`}
               >
-                {quotaReached ? '✨ Quota atteint' : aiLoading ? (
+                {noCredits ? '✨ Plus de crédits IA' : aiLoading ? (
                   batchProgress
                     ? `⏳ ${batchProgress.done}/${batchProgress.total} · ${batchProgress.newCount ?? 0} nouvelles · ⚡${batchProgress.cached ?? 0} cache`
                     : '⏳ Préparation...'
@@ -200,7 +202,9 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
               </button>
               {aiQuota && (
                 <span className="text-fmc-text-dim text-xs font-mono">
-                  ({aiQuota.listing_analyses_used}/{aiQuota.listing_analyses_max} analyses utilisées)
+                  {creditsLeft !== null
+                    ? `${creditsLeft} crédit${creditsLeft > 1 ? 's' : ''} IA restant${creditsLeft > 1 ? 's' : ''}`
+                    : `${aiQuota.listing_analyses_used} analyses effectuées`}
                 </span>
               )}
             </div>
@@ -229,6 +233,7 @@ export default function ResultsGrid({ results, loading, onOpenModal, likedIds = 
             isAnalyzing={currentlyAnalyzing === l.id}
             isViewed={viewedIds.has(l.id)}
             hasAiAnalysis={!!cardAnalyses[l.id]?.reponse}
+            isHotPick={hotPickId !== null && l.id === hotPickId}
           />
         ))}
       </div>

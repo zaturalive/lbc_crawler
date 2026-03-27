@@ -10,7 +10,7 @@ services:
     container_name: fmc-frontend-dev
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3005:80"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
@@ -40,7 +40,7 @@ services:
       - CORS_ORIGINS=*
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GITHUB_MODEL=${GITHUB_MODEL:-gpt-4o-mini}
-      - ADMIN_USER_IDS=${ADMIN_USER_IDS:-1,6}
+      - ADMIN_USER_IDS=${ADMIN_USER_IDS:-1,2,6}
     depends_on:
       mariadb:
         condition: service_healthy

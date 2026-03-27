@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, SlidersHorizontal } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Sparkles } from 'lucide-react';
 import NumberInput from './ui/NumberInput';
 
 export default function ListingsFilterBar({ listings, onFiltered, analyzedIds = new Set() }) {
@@ -110,7 +110,7 @@ export default function ListingsFilterBar({ listings, onFiltered, analyzedIds = 
                 checked={checkedKeywords.includes(kw)}
                 onChange={() => toggleKeyword(kw)}
               />
-              <span className="text-fmc-text-dim">{kw}</span>
+              <span className={`${checkedKeywords.includes(kw) ? 'text-fmc-text' : 'text-fmc-text-dim'}`}>{kw}</span>
             </label>
           ))}
         </div>
@@ -123,7 +123,7 @@ export default function ListingsFilterBar({ listings, onFiltered, analyzedIds = 
           checked={onlyWithFiche}
           onChange={e => setOnlyWithFiche(e.target.checked)}
         />
-        <span className={onlyWithFiche ? 'text-fmc-accent' : 'text-fmc-text-dim'}>
+        <span className={onlyWithFiche ? 'text-fmc-accent' : 'text-fmc-text'}>
           Avec fiche fiabilité
         </span>
       </label>
@@ -135,8 +135,9 @@ export default function ListingsFilterBar({ listings, onFiltered, analyzedIds = 
           checked={onlyWithAI}
           onChange={e => setOnlyWithAI(e.target.checked)}
         />
-        <span className={onlyWithAI ? 'text-purple-300' : 'text-fmc-text-dim'}>
-          ✨ Déjà analysée IA
+        <span className={`flex items-center gap-1 ${onlyWithAI ? 'text-purple-300' : 'text-fmc-text'}`}>
+          <Sparkles className="h-3 w-3" />
+          Déjà analysée IA
         </span>
       </label>
 

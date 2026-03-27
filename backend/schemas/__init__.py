@@ -69,6 +69,7 @@ class SearchResult(BaseModel):
     count: int
     limit: int
     listings: list[ListingResponse]
+    hot_pick_id: Optional[int] = None  # ID de la meilleure annonce (🔥 voiture du lot)
 
 
 class PatternResponse(BaseModel):

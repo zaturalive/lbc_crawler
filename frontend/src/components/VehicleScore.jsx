@@ -22,21 +22,17 @@ const scoreTextClass = (score) => {
   return 'text-fmc-danger';
 };
 
-// Parse issue string in format "title:description"
-function parseIssue(issue) {
-  if (typeof issue !== 'string') return { title: String(issue), description: '' };
+// Extract label from "Label: N témoignages" format
+function parseIssueName(issue) {
+  if (typeof issue !== 'string') return String(issue);
   const colonIdx = issue.indexOf(':');
-  if (colonIdx === -1) return { title: issue, description: '' };
-  return {
-    title: issue.slice(0, colonIdx).trim(),
-    description: issue.slice(colonIdx + 1).trim(),
-  };
+  return colonIdx !== -1 ? issue.slice(0, colonIdx).trim() : issue;
 }
 
 export default function VehicleScore({ vehicle }) {
   if (!vehicle) return null;
 
-  const { reliability_score, common_issues, total_testimonials } = vehicle;
+  const { reliability_score, common_issues, known_issues_text, total_testimonials, reliability_rank } = vehicle;
   const hasScore = reliability_score !== null && reliability_score !== undefined;
 
   return (
@@ -47,32 +43,50 @@ export default function VehicleScore({ vehicle }) {
           scoreBorderClass(reliability_score),
           scoreTextClass(reliability_score),
         )}>
-        {hasScore ? reliability_score : '–'}
+          {hasScore ? reliability_score : '–'}
         </div>
-        <span className="text-fmc-text-dim text-xs leading-tight">
-          {hasScore
-            ? `/100 fiabilité${total_testimonials ? ` · ${total_testimonials.toLocaleString('fr-FR')} tém.` : ''}`
-            : 'N/A'
-          }
-        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-fmc-text-dim text-xs leading-tight">
+            {hasScore
+              ? `/100 fiabilité${total_testimonials ? ` · ${total_testimonials.toLocaleString('fr-FR')} tém.` : ''}`
+              : 'N/A'
+            }
+          </span>
+          {reliability_rank && (
+            <span className="text-fmc-text-muted text-[10px] font-mono capitalize">
+              Catégorie : {reliability_rank}
+            </span>
+          )}
+        </div>
       </div>
-      {common_issues && common_issues.length > 0 ? (
-        <ul className="space-y-2 text-sm">
-          {common_issues.slice(0, 3).map((issue, i) => {
-            const { title, description } = parseIssue(issue);
+
+      {/* Problèmes courants (labels uniquement) */}
+      {common_issues && common_issues.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {common_issues.slice(0, 5).map((issue, i) => (
+            <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800/70 text-zinc-400 border border-zinc-700/40">
+              {parseIssueName(issue)}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Descriptions détaillées des problèmes */}
+      {known_issues_text && known_issues_text.length > 0 ? (
+        <ul className="space-y-1.5 text-xs">
+          {known_issues_text.slice(0, 2).map((issueBlock, i) => {
+            const text = typeof issueBlock === 'string' ? issueBlock : String(issueBlock);
+            // Split on ". " ou ":" to extract individual points
+            const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.length > 20);
+            const preview = sentences[0] || text;
             return (
-              <li key={i}>
-                <span className="font-medium text-fmc-text capitalize">• {title}</span>
-                {description && (
-                  <span className="text-fmc-text-muted text-xs block ml-4">
-                    {description.slice(0, 80)}{description.length > 80 ? '…' : ''}
-                  </span>
-                )}
+              <li key={i} className="text-fmc-text-muted leading-relaxed">
+                {preview.slice(0, 120)}{preview.length > 120 ? '…' : ''}
               </li>
             );
           })}
         </ul>
-      ) : (
+      ) : common_issues && common_issues.length > 0 ? null : (
         <p className="text-sm text-fmc-text-muted">Données fiabilité non disponibles</p>
       )}
     </div>

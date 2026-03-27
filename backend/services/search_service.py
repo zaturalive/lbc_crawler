@@ -92,7 +92,68 @@ async def run_search(req: SearchRequest, db: AsyncSession) -> SearchResult:
     except Exception:
         pass  # Ne pas faire échouer la recherche pour ca
 
-    return SearchResult(session_id=history_id, history_id=history_id, count=len(upserted), limit=req.limit, listings=upserted)
+    return SearchResult(session_id=history_id, history_id=history_id, count=len(upserted), limit=req.limit, listings=upserted, hot_pick_id=_compute_hot_pick(upserted))
+
+
+def _compute_hot_pick(listings: list) -> Optional[int]:
+    """
+    Identifie la meilleure annonce du lot selon un score composite:
+    - Fiabilité vehicle (40%) : reliability_score / 100
+    - Rapport qualité/prix (40%) : score basé sur km/prix faible
+    - Âge récent (20%) : préférence pour les voitures récentes
+
+    Retourne le listing.id de la meilleure annonce, ou None si impossible à calculer.
+    """
+    candidates = [l for l in listings if l.price and l.price > 0 and l.mileage is not None]
+    if not candidates:
+        return None
+
+    import math
+
+    scores = []
+    for l in candidates:
+        # Score fiabilité (0-40)
+        reliability = (l.vehicle.reliability_score or 0) / 100 * 40 if l.vehicle else 0
+
+        # Score rapport km/prix (0-40) — moins c'est cher avec peu de km, mieux c'est
+        # Normalisation: ratio km/prix faible = mieux. On inverse et normalise.
+        km_per_euro = (l.mileage or 0) / max(l.price, 1)
+        # log pour atténuer les extrêmes, score inversé (moins = mieux)
+        qp_raw = math.log1p(km_per_euro * 10000)  # amplifie pour être dans une plage lisible
+        qp_score = 40  # sera normalisé après
+
+        # Score ancienneté (0-20) — voitures entre 2 et 8 ans d'ancienneté sont idéales
+        from datetime import datetime
+        current_year = datetime.now().year
+        age = current_year - (l.year or current_year)
+        if 2 <= age <= 8:
+            age_score = 20
+        elif age <= 12:
+            age_score = 12
+        else:
+            age_score = 5
+
+        scores.append({
+            "id": l.id,
+            "reliability": reliability,
+            "km_per_euro": km_per_euro,
+            "age_score": age_score,
+        })
+
+    if not scores:
+        return None
+
+    # Normalise km_per_euro: inverse, scale 0-40
+    max_kpe = max(s["km_per_euro"] for s in scores) or 1
+    for s in scores:
+        s["qp_score"] = (1 - s["km_per_euro"] / max_kpe) * 40
+
+    # Calcule score final
+    for s in scores:
+        s["total"] = s["reliability"] + s["qp_score"] + s["age_score"]
+
+    best = max(scores, key=lambda s: s["total"])
+    return best["id"]
 
 
 async def _call_scraper(payload: dict) -> list[dict]:

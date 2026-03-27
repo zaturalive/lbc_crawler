@@ -110,7 +110,7 @@ const KEYWORD_VARIANTS = {
   'Premier propriétaire':'purple',
 };
 
-export default function ListingCard({ listing, onOpenModal, isLiked = false, onToggleLike, aiMode = false, aiAnalysis = null, isAnalyzing = false, isViewed = false, hasAiAnalysis = false }) {
+export default function ListingCard({ listing, onOpenModal, isLiked = false, onToggleLike, aiMode = false, aiAnalysis = null, isAnalyzing = false, isViewed = false, hasAiAnalysis = false, isHotPick = false }) {
   const { title, price, year, mileage, location, url, matched_keywords, vehicle, gearbox, horsepower, fuel_type, doors, seats, color } = listing;
   const [galleryOpen, setGalleryOpen] = useState(false);
 
@@ -128,7 +128,7 @@ export default function ListingCard({ listing, onOpenModal, isLiked = false, onT
   return (
     <>
     <Card
-      className={`group animate-fade-in relative ${aiMode ? 'ai-mode-card' : ''} ${isAnalyzing ? 'ring-2 ring-purple-500/60 ring-offset-1 ring-offset-transparent' : ''}`}
+      className={`group animate-fade-in relative ${aiMode ? 'ai-mode-card' : ''} ${isAnalyzing ? 'ring-2 ring-purple-500/60 ring-offset-1 ring-offset-transparent' : ''} ${isHotPick ? 'hot-pick-card' : ''}`}
       onClick={() => onOpenModal && onOpenModal(listing)}
     >
       <CardContent className="space-y-3">
@@ -168,6 +168,11 @@ export default function ListingCard({ listing, onOpenModal, isLiked = false, onT
         {/* Title + Price + Badges + Like */}
         <div className="flex items-start justify-between gap-2 min-w-0">
           <div className="space-y-1 min-w-0 flex-1">
+            {isHotPick && (
+              <div className="hot-pick-badge inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono mb-1">
+                🔥 Voiture du lot
+              </div>
+            )}
             <h3 className="text-sm font-semibold text-fmc-text group-hover:text-fmc-glow transition-colors line-clamp-2 font-mono leading-snug">
               {title || 'Annonce sans titre'}
             </h3>
